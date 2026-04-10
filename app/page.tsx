@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import * as XLSX from "xlsx";
+// @ts-ignore
 import Papa from "papaparse";
 
 export default function Home() {
