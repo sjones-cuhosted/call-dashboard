@@ -73,6 +73,20 @@ export default function Home() {
     setResults(formatted);
   }
 
+  function downloadExcel() {
+    if (!results) return;
+
+    const ws = XLSX.utils.json_to_sheet(results);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Summary");
+
+    XLSX.writeFile(wb, "call_report.xlsx");
+  }
+
+  const totalCalls = results
+    ? results.reduce((sum: number, r: any) => sum + r.Total, 0)
+    : 0;
+
   return (
     <div
       style={{
@@ -93,32 +107,46 @@ export default function Home() {
           boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
         }}
       >
-        <h1 style={{ fontSize: 28, marginBottom: 10 }}>📞 Call Dashboard</h1>
+        <h1 style={{ fontSize: 28 }}>📞 Call Dashboard</h1>
 
-        <p style={{ color: "#444", marginBottom: 20 }}>
-          Upload call records and generate reports instantly
-        </p>
+        {/* 🔥 SUMMARY CARDS */}
+        {results && (
+          <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
+            <div style={card}>
+              <h3>Total Calls</h3>
+              <p style={cardNumber}>{totalCalls}</p>
+            </div>
+          </div>
+        )}
 
-        <label style={label}>Exclude Extensions</label>
-        <input
-          placeholder="e.g. 300,800"
-          onChange={(e) => setExcluded(e.target.value)}
-          style={inputStyle}
-        />
+        <div style={{ marginTop: 20 }}>
+          <label style={label}>Exclude Extensions</label>
+          <input
+            placeholder="300,800"
+            onChange={(e) => setExcluded(e.target.value)}
+            style={inputStyle}
+          />
 
-        <label style={label}>Exclude Ranges</label>
-        <input
-          placeholder="e.g. 400-499,700-799"
-          onChange={(e) => setRanges(e.target.value)}
-          style={inputStyle}
-        />
+          <label style={label}>Exclude Ranges</label>
+          <input
+            placeholder="400-499,700-799"
+            onChange={(e) => setRanges(e.target.value)}
+            style={inputStyle}
+          />
 
-        <label style={label}>Upload File</label>
-        <input
-          type="file"
-          onChange={(e) => handleFile(e.target.files?.[0] as File)}
-          style={{ marginBottom: 20 }}
-        />
+          <label style={label}>Upload File</label>
+          <input
+            type="file"
+            onChange={(e) => handleFile(e.target.files?.[0] as File)}
+          />
+        </div>
+
+        {/* 🔥 DOWNLOAD BUTTON */}
+        {results && (
+          <button onClick={downloadExcel} style={button}>
+            Download Excel
+          </button>
+        )}
 
         {results && (
           <table
@@ -151,31 +179,49 @@ export default function Home() {
   );
 }
 
+const card = {
+  flex: 1,
+  background: "#f3f4f6",
+  padding: 20,
+  borderRadius: 10,
+};
+
+const cardNumber = {
+  fontSize: 28,
+  fontWeight: "bold",
+};
+
 const label = {
   display: "block",
+  marginTop: 10,
   marginBottom: 5,
-  fontWeight: "bold" as const,
-  color: "#111",
+  fontWeight: "bold",
 };
 
 const inputStyle = {
   width: "100%",
   padding: 10,
-  marginBottom: 15,
+  marginBottom: 10,
   borderRadius: 6,
   border: "1px solid #ccc",
-  color: "#111",
-  backgroundColor: "#fff",
+};
+
+const button = {
+  marginTop: 15,
+  padding: "10px 15px",
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  borderRadius: 6,
+  cursor: "pointer",
 };
 
 const th = {
   padding: 10,
   textAlign: "left" as const,
-  color: "#111",
 };
 
 const td = {
   padding: 10,
   borderTop: "1px solid #eee",
-  color: "#111",
 };
