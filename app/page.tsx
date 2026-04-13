@@ -7,17 +7,14 @@ import Papa from "papaparse";
 
 export default function Home() {
   const [results, setResults] = useState<any>(null);
+  const [rawData, setRawData] = useState<any[]>([]);
   const [excluded, setExcluded] = useState("");
   const [ranges, setRanges] = useState("");
 
   function parseFilters() {
-    const excludedList = excluded
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .map(Number);
+    const excludedList = excluded.split(",").map(x => x.trim()).filter(Boolean).map(Number);
 
-    const rangeList = ranges.split(",").map((r) => {
+    const rangeList = ranges.split(",").map(r => {
       const [start, end] = r.split("-").map(Number);
       return { start, end };
     });
@@ -46,6 +43,7 @@ export default function Home() {
     const { excludedList, rangeList } = parseFilters();
 
     let summary: any = {};
+    let detail: any[] = [];
 
     parsed.forEach((row: any) => {
       const ext = row["To User"]?.toString().trim();
@@ -53,11 +51,15 @@ export default function Home() {
       if (ext && !isExcluded(ext, excludedList, rangeList)) {
         const date = row["Call Date"];
 
-        if (!summary[date]) {
-          summary[date] = { total: 0 };
-        }
-
+        // Summary
+        if (!summary[date]) summary[date] = { total: 0 };
         summary[date].total++;
+
+        // Detail
+        detail.push({
+          Date: date,
+          Extension: ext
+        });
       }
     });
 
@@ -66,19 +68,24 @@ export default function Home() {
       return {
         Day: d.toLocaleDateString("en-US", { weekday: "long" }),
         Date: d.toLocaleDateString("en-US"),
-        Total: val.total,
+        Total: val.total
       };
     });
 
     setResults(formatted);
+    setRawData(detail);
   }
 
   function downloadExcel() {
-    if (!results) return;
-
-    const ws = XLSX.utils.json_to_sheet(results);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Summary");
+
+    // Tab 1
+    const ws1 = XLSX.utils.json_to_sheet(results);
+    XLSX.utils.book_append_sheet(wb, ws1, "Summary");
+
+    // Tab 2
+    const ws2 = XLSX.utils.json_to_sheet(rawData);
+    XLSX.utils.book_append_sheet(wb, ws2, "Details");
 
     XLSX.writeFile(wb, "call_report.xlsx");
   }
@@ -88,140 +95,29 @@ export default function Home() {
     : 0;
 
   return (
-    <div
-      style={{
-        backgroundColor: "#f9fafb",
-        minHeight: "100vh",
-        padding: 40,
-        fontFamily: "Arial, sans-serif",
-        color: "#111",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 900,
-          margin: "auto",
-          background: "white",
-          padding: 30,
-          borderRadius: 12,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-        }}
-      >
-        <h1 style={{ fontSize: 28 }}>📞 Call Dashboard</h1>
+    <div style={{ backgroundColor: "#f9fafb", minHeight: "100vh", padding: 40 }}>
+      <div style={{ maxWidth: 900, margin: "auto", background: "white", padding: 30, borderRadius: 12 }}>
+        <h1>📞 Call Dashboard</h1>
 
-        {/* 🔥 SUMMARY CARDS */}
         {results && (
-          <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
-            <div style={card}>
-              <h3>Total Calls</h3>
-              <p style={cardNumber}>{totalCalls}</p>
-            </div>
+          <div style={{ marginTop: 20 }}>
+            <strong>Total Calls: {totalCalls}</strong>
           </div>
         )}
 
-        <div style={{ marginTop: 20 }}>
-          <label style={label}>Exclude Extensions</label>
-          <input
-            placeholder="300,800"
-            onChange={(e) => setExcluded(e.target.value)}
-            style={inputStyle}
-          />
-
-          <label style={label}>Exclude Ranges</label>
-          <input
-            placeholder="400-499,700-799"
-            onChange={(e) => setRanges(e.target.value)}
-            style={inputStyle}
-          />
-
-          <label style={label}>Upload File</label>
-          <input
-            type="file"
-            onChange={(e) => handleFile(e.target.files?.[0] as File)}
-          />
-        </div>
-
-        {/* 🔥 DOWNLOAD BUTTON */}
-        {results && (
-          <button onClick={downloadExcel} style={button}>
-            Download Excel
-          </button>
-        )}
+        <input placeholder="Exclude extensions" onChange={e => setExcluded(e.target.value)} />
+        <br /><br />
+        <input placeholder="Exclude ranges" onChange={e => setRanges(e.target.value)} />
+        <br /><br />
+        <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} />
 
         {results && (
-          <table
-            style={{
-              marginTop: 20,
-              width: "100%",
-              borderCollapse: "collapse",
-            }}
-          >
-            <thead>
-              <tr style={{ background: "#f3f4f6" }}>
-                <th style={th}>Day</th>
-                <th style={th}>Date</th>
-                <th style={th}>Total Calls</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r: any, i: number) => (
-                <tr key={i}>
-                  <td style={td}>{r.Day}</td>
-                  <td style={td}>{r.Date}</td>
-                  <td style={td}>{r.Total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <br /><br />
+            <button onClick={downloadExcel}>Download Excel (2 Tabs)</button>
+          </>
         )}
       </div>
     </div>
   );
 }
-
-const card = {
-  flex: 1,
-  background: "#f3f4f6",
-  padding: 20,
-  borderRadius: 10,
-};
-
-const cardNumber = {
-  fontSize: 28,
-  fontWeight: "bold",
-};
-
-const label = {
-  display: "block",
-  marginTop: 10,
-  marginBottom: 5,
-  fontWeight: "bold",
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: 10,
-  marginBottom: 10,
-  borderRadius: 6,
-  border: "1px solid #ccc",
-};
-
-const button = {
-  marginTop: 15,
-  padding: "10px 15px",
-  background: "#2563eb",
-  color: "white",
-  border: "none",
-  borderRadius: 6,
-  cursor: "pointer",
-};
-
-const th = {
-  padding: 10,
-  textAlign: "left" as const,
-};
-
-const td = {
-  padding: 10,
-  borderTop: "1px solid #eee",
-};
