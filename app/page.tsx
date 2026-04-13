@@ -60,22 +60,18 @@ export default function Home() {
       if (ext && !isExcluded(ext, excludedList, rangeList)) {
         const date = row["Call Date"];
 
-        // Summary
         if (!summary[date]) summary[date] = { total: 0 };
         summary[date].total++;
 
-        // Detail
         detail.push({
           Date: date,
           Extension: ext
         });
 
-        // Voicemail
         if (disposition.toLowerCase().includes("vmail")) {
           vmCount++;
         }
 
-        // Callback tracking
         if (!callMap[caller]) {
           callMap[caller] = 1;
         } else {
@@ -117,41 +113,53 @@ export default function Home() {
     <div style={outer}>
       <div style={card}>
 
+        {/* HEADER */}
         <div style={header}>
           <img src="/logo.png" style={logo} />
-          <h1>Call Dashboard</h1>
+          <h1 style={title}>Call Dashboard</h1>
         </div>
 
-        {/* 🔥 STATS CARDS */}
+        {/* STATS */}
         {summaryData.length > 0 && (
           <div style={statsRow}>
-            <div style={statCard}>
-              <h3>Total</h3>
-              <p>{totalCalls}</p>
-            </div>
-            <div style={statCard}>
-              <h3>Voicemail</h3>
-              <p>{voicemails}</p>
-            </div>
-            <div style={statCard}>
-              <h3>Callbacks</h3>
-              <p>{callbacks}</p>
-            </div>
+            <Stat label="Total Calls" value={totalCalls} />
+            <Stat label="Voicemails" value={voicemails} />
+            <Stat label="Callbacks" value={callbacks} />
           </div>
         )}
 
-        <div style={{ marginTop: 20 }}>
-          <input placeholder="Exclude extensions (300,800)" onChange={e => setExcluded(e.target.value)} style={input} />
-          <input placeholder="Exclude ranges (400-499)" onChange={e => setRanges(e.target.value)} style={input} />
-          <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} />
+        {/* INPUTS */}
+        <div style={form}>
+          <Label text="Exclude Extensions" />
+          <input
+            placeholder="300, 800"
+            onChange={e => setExcluded(e.target.value)}
+            style={input}
+          />
+
+          <Label text="Exclude Ranges" />
+          <input
+            placeholder="400-499, 700-799"
+            onChange={e => setRanges(e.target.value)}
+            style={input}
+          />
+
+          <Label text="Upload Call File" />
+          <input
+            type="file"
+            onChange={e => handleFile(e.target.files?.[0] as File)}
+            style={fileInput}
+          />
         </div>
 
+        {/* DOWNLOAD */}
         {summaryData.length > 0 && (
           <button onClick={downloadExcel} style={button}>
-            Download Excel
+            Download Excel Report
           </button>
         )}
 
+        {/* TABLE */}
         {summaryData.length > 0 && (
           <table style={table}>
             <thead>
@@ -178,25 +186,118 @@ export default function Home() {
   );
 }
 
+/* COMPONENTS */
+
+function Stat({ label, value }: any) {
+  return (
+    <div style={statCard}>
+      <div style={statLabel}>{label}</div>
+      <div style={statValue}>{value}</div>
+    </div>
+  );
+}
+
+function Label({ text }: any) {
+  return <div style={label}>{text}</div>;
+}
+
 /* STYLES */
 
-const outer = { backgroundColor: "#f3f4f6", minHeight: "100vh", padding: 40 };
-const card = { maxWidth: 900, margin: "auto", background: "white", padding: 30, borderRadius: 12 };
-const header = { display: "flex", alignItems: "center", gap: 15 };
+const outer = {
+  backgroundColor: "#f3f4f6",
+  minHeight: "100vh",
+  padding: 40,
+};
+
+const card = {
+  maxWidth: 900,
+  margin: "auto",
+  background: "white",
+  padding: 30,
+  borderRadius: 12,
+  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+};
+
+const header = {
+  display: "flex",
+  alignItems: "center",
+  gap: 15,
+  borderBottom: "1px solid #e5e7eb",
+  paddingBottom: 15,
+};
+
 const logo = { height: 45 };
 
-const statsRow = { display: "flex", gap: 15, marginTop: 20 };
+const title = {
+  margin: 0,
+  color: "#111",
+  fontSize: 24,
+  fontWeight: 600,
+};
+
+const statsRow = {
+  display: "flex",
+  gap: 15,
+  marginTop: 20,
+};
+
 const statCard = {
   flex: 1,
   background: "#f9fafb",
+  border: "1px solid #e5e7eb",
   padding: 15,
-  borderRadius: 8,
-  textAlign: "center" as const
+  borderRadius: 10,
 };
 
-const input = { width: "100%", padding: 10, marginTop: 10 };
-const button = { marginTop: 15, padding: 10 };
+const statLabel = { fontSize: 13, color: "#666" };
+const statValue = { fontSize: 22, fontWeight: "bold", color: "#111" };
 
-const table = { width: "100%", marginTop: 20 };
-const th = { textAlign: "left" as const };
-const td = {};
+const form = { marginTop: 25 };
+
+const label = {
+  fontSize: 13,
+  color: "#555",
+  marginBottom: 5,
+};
+
+const input = {
+  width: "100%",
+  padding: 12,
+  marginBottom: 15,
+  borderRadius: 6,
+  border: "1px solid #d1d5db",
+  color: "#111",
+};
+
+const fileInput = {
+  marginTop: 5,
+  marginBottom: 15,
+  color: "#111",
+};
+
+const button = {
+  marginTop: 10,
+  padding: "12px 18px",
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  borderRadius: 6,
+  cursor: "pointer",
+};
+
+const table = {
+  width: "100%",
+  marginTop: 20,
+  borderCollapse: "collapse" as const,
+};
+
+const th = {
+  textAlign: "left" as const,
+  borderBottom: "2px solid #e5e7eb",
+  padding: 10,
+};
+
+const td = {
+  padding: 10,
+  borderBottom: "1px solid #f1f1f1",
+};
