@@ -11,11 +11,17 @@ export default function Home() {
   const [ranges, setRanges] = useState("");
 
   function parseFilters() {
-    const excludedList = excluded.split(",").map(x => x.trim()).filter(Boolean).map(Number);
-    const rangeList = ranges.split(",").map(r => {
+    const excludedList = excluded
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .map(Number);
+
+    const rangeList = ranges.split(",").map((r) => {
       const [start, end] = r.split("-").map(Number);
       return { start, end };
     });
+
     return { excludedList, rangeList };
   }
 
@@ -25,9 +31,11 @@ export default function Home() {
     if (isNaN(num)) return true;
 
     if (excludedList.includes(num)) return true;
+
     for (let r of rangeList) {
       if (num >= r.start && num <= r.end) return true;
     }
+
     return false;
   }
 
@@ -58,7 +66,7 @@ export default function Home() {
       return {
         Day: d.toLocaleDateString("en-US", { weekday: "long" }),
         Date: d.toLocaleDateString("en-US"),
-        Total: val.total
+        Total: val.total,
       };
     });
 
@@ -66,52 +74,60 @@ export default function Home() {
   }
 
   return (
-    <div style={{
-      backgroundColor: "#f9fafb",
-      minHeight: "100vh",
-      padding: 40,
-      fontFamily: "Arial, sans-serif"
-    }}>
-      <div style={{
-        maxWidth: 900,
-        margin: "auto",
-        background: "white",
-        padding: 30,
-        borderRadius: 12,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
-      }}>
-        <h1 style={{ fontSize: 28, marginBottom: 10 }}>
-          📞 Call Dashboard
-        </h1>
+    <div
+      style={{
+        backgroundColor: "#f9fafb",
+        minHeight: "100vh",
+        padding: 40,
+        fontFamily: "Arial, sans-serif",
+        color: "#111",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 900,
+          margin: "auto",
+          background: "white",
+          padding: 30,
+          borderRadius: 12,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+        }}
+      >
+        <h1 style={{ fontSize: 28, marginBottom: 10 }}>📞 Call Dashboard</h1>
 
-        <p style={{ color: "#555", marginBottom: 20 }}>
+        <p style={{ color: "#444", marginBottom: 20 }}>
           Upload call records and generate reports instantly
         </p>
 
+        <label style={label}>Exclude Extensions</label>
         <input
-          placeholder="Exclude extensions (300,800)"
-          onChange={e => setExcluded(e.target.value)}
+          placeholder="e.g. 300,800"
+          onChange={(e) => setExcluded(e.target.value)}
           style={inputStyle}
         />
 
+        <label style={label}>Exclude Ranges</label>
         <input
-          placeholder="Exclude ranges (400-499)"
-          onChange={e => setRanges(e.target.value)}
+          placeholder="e.g. 400-499,700-799"
+          onChange={(e) => setRanges(e.target.value)}
           style={inputStyle}
         />
 
+        <label style={label}>Upload File</label>
         <input
           type="file"
-          onChange={e => handleFile(e.target.files?.[0] as File)}
-          style={{ marginTop: 10 }}
+          onChange={(e) => handleFile(e.target.files?.[0] as File)}
+          style={{ marginBottom: 20 }}
         />
 
         {results && (
-          <table style={{
-            marginTop: 30,
-            width: "100%",
-            borderCollapse: "collapse"
-          }}>
+          <table
+            style={{
+              marginTop: 20,
+              width: "100%",
+              borderCollapse: "collapse",
+            }}
+          >
             <thead>
               <tr style={{ background: "#f3f4f6" }}>
                 <th style={th}>Day</th>
@@ -135,20 +151,31 @@ export default function Home() {
   );
 }
 
+const label = {
+  display: "block",
+  marginBottom: 5,
+  fontWeight: "bold" as const,
+  color: "#111",
+};
+
 const inputStyle = {
   width: "100%",
   padding: 10,
-  marginBottom: 10,
+  marginBottom: 15,
   borderRadius: 6,
-  border: "1px solid #ccc"
+  border: "1px solid #ccc",
+  color: "#111",
+  backgroundColor: "#fff",
 };
 
 const th = {
   padding: 10,
-  textAlign: "left" as const
+  textAlign: "left" as const,
+  color: "#111",
 };
 
 const td = {
   padding: 10,
-  borderTop: "1px solid #eee"
+  borderTop: "1px solid #eee",
+  color: "#111",
 };
