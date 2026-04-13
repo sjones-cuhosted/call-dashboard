@@ -89,71 +89,52 @@ export default function Home() {
   const totalCalls = summaryData.reduce((sum, r) => sum + r.Total, 0);
 
   return (
-    <div style={{
-      backgroundColor: "#f9fafb",
-      minHeight: "100vh",
-      padding: 40,
-      fontFamily: "Arial",
-      color: "#111"
-    }}>
-      <div style={{
-        maxWidth: 900,
-        margin: "auto",
-        background: "white",
-        padding: 30,
-        borderRadius: 12,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
-      }}>
+    <div style={outer}>
+      <div style={card}>
 
-        {/* 🔥 HEADER WITH LOGO */}
-        <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
-          <img src="/logo.png" alt="logo" style={{ height: 50 }} />
+        {/* HEADER */}
+        <div style={header}>
+          <img src="/logo.png" style={logo} />
           <h1 style={{ margin: 0 }}>Call Dashboard</h1>
         </div>
 
         {/* SUMMARY */}
         {summaryData.length > 0 && (
-          <div style={{
-            background: "#f3f4f6",
-            padding: 15,
-            borderRadius: 8,
-            marginTop: 15
-          }}>
-            <strong>Total Calls: {totalCalls}</strong>
+          <div style={summaryBox}>
+            Total Calls: <strong>{totalCalls}</strong>
           </div>
         )}
 
+        {/* INPUTS */}
         <div style={{ marginTop: 20 }}>
-          <input placeholder="Exclude extensions (300,800)" onChange={e => setExcluded(e.target.value)} />
-          <br /><br />
-          <input placeholder="Exclude ranges (400-499)" onChange={e => setRanges(e.target.value)} />
-          <br /><br />
-          <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} />
+          <input placeholder="Exclude extensions (300,800)" onChange={e => setExcluded(e.target.value)} style={input} />
+          <input placeholder="Exclude ranges (400-499)" onChange={e => setRanges(e.target.value)} style={input} />
+          <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} style={{ marginTop: 10 }} />
         </div>
 
         {/* DOWNLOAD */}
         {summaryData.length > 0 && (
-          <button onClick={downloadExcel} style={{ marginTop: 20 }}>
+          <button onClick={downloadExcel} style={button}>
             Download Excel
           </button>
         )}
 
         {/* TABLE */}
         {summaryData.length > 0 && (
-          <table style={{ marginTop: 20, width: "100%" }}>
+          <table style={table}>
             <thead>
               <tr>
-                <th>Day</th>
-                <th>Date</th>
-                <th>Total Calls</th>
+                <th style={th}>Day</th>
+                <th style={th}>Date</th>
+                <th style={th}>Total Calls</th>
               </tr>
             </thead>
             <tbody>
               {summaryData.map((r, i) => (
                 <tr key={i}>
-                  <td>{r.Day}</td>
-                  <td>{r.Date}</td>
-                  <td>{r.Total}</td>
+                  <td style={td}>{r.Day}</td>
+                  <td style={td}>{r.Date}</td>
+                  <td style={td}>{r.Total}</td>
                 </tr>
               ))}
             </tbody>
@@ -164,3 +145,75 @@ export default function Home() {
     </div>
   );
 }
+
+/* 🎨 STYLES */
+
+const outer = {
+  backgroundColor: "#f3f4f6",
+  minHeight: "100vh",
+  padding: 40,
+};
+
+const card = {
+  maxWidth: 900,
+  margin: "auto",
+  background: "white",
+  padding: 30,
+  borderRadius: 12,
+  boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
+};
+
+const header = {
+  display: "flex",
+  alignItems: "center",
+  gap: 15,
+  borderBottom: "1px solid #eee",
+  paddingBottom: 10,
+};
+
+const logo = {
+  height: 45,
+};
+
+const summaryBox = {
+  marginTop: 20,
+  padding: 15,
+  background: "#f9fafb",
+  border: "1px solid #e5e7eb",
+  borderRadius: 8,
+};
+
+const input = {
+  width: "100%",
+  padding: 10,
+  marginTop: 10,
+  borderRadius: 6,
+  border: "1px solid #ccc",
+};
+
+const button = {
+  marginTop: 15,
+  padding: "10px 15px",
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  borderRadius: 6,
+  cursor: "pointer",
+};
+
+const table = {
+  width: "100%",
+  marginTop: 20,
+  borderCollapse: "collapse" as const,
+};
+
+const th = {
+  borderBottom: "2px solid #ddd",
+  padding: 10,
+  textAlign: "left" as const,
+};
+
+const td = {
+  borderBottom: "1px solid #eee",
+  padding: 10,
+};
