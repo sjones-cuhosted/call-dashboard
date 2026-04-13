@@ -95,7 +95,7 @@ export default function Home() {
         {/* HEADER */}
         <div style={header}>
           <img src="/logo.png" style={logo} />
-          <h1 style={{ margin: 0 }}>Call Dashboard</h1>
+          <h1 style={{ margin: 0, color: "#111" }}>Call Dashboard</h1>
         </div>
 
         {/* SUMMARY */}
@@ -107,9 +107,23 @@ export default function Home() {
 
         {/* INPUTS */}
         <div style={{ marginTop: 20 }}>
-          <input placeholder="Exclude extensions (300,800)" onChange={e => setExcluded(e.target.value)} style={input} />
-          <input placeholder="Exclude ranges (400-499)" onChange={e => setRanges(e.target.value)} style={input} />
-          <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} style={{ marginTop: 10 }} />
+          <input
+            placeholder="Exclude extensions (300,800)"
+            onChange={e => setExcluded(e.target.value)}
+            style={input}
+          />
+
+          <input
+            placeholder="Exclude ranges (400-499)"
+            onChange={e => setRanges(e.target.value)}
+            style={input}
+          />
+
+          <input
+            type="file"
+            onChange={e => handleFile(e.target.files?.[0] as File)}
+            style={{ marginTop: 10, color: "#111" }}
+          />
         </div>
 
         {/* DOWNLOAD */}
@@ -152,6 +166,7 @@ const outer = {
   backgroundColor: "#f3f4f6",
   minHeight: "100vh",
   padding: 40,
+  color: "#111",
 };
 
 const card = {
@@ -181,6 +196,7 @@ const summaryBox = {
   background: "#f9fafb",
   border: "1px solid #e5e7eb",
   borderRadius: 8,
+  color: "#111",
 };
 
 const input = {
@@ -189,6 +205,8 @@ const input = {
   marginTop: 10,
   borderRadius: 6,
   border: "1px solid #ccc",
+  color: "#111", // 🔥 FIX
+  backgroundColor: "#fff",
 };
 
 const button = {
@@ -211,9 +229,11 @@ const th = {
   borderBottom: "2px solid #ddd",
   padding: 10,
   textAlign: "left" as const,
+  color: "#111",
 };
 
 const td = {
   borderBottom: "1px solid #eee",
   padding: 10,
+  color: "#111",
 };
