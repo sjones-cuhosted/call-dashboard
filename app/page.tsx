@@ -6,8 +6,8 @@ import * as XLSX from "xlsx";
 import Papa from "papaparse";
 
 export default function Home() {
-  const [results, setResults] = useState<any>(null);
-  const [rawData, setRawData] = useState<any[]>([]);
+  const [summaryData, setSummaryData] = useState<any[]>([]);
+  const [detailData, setDetailData] = useState<any[]>([]);
   const [excluded, setExcluded] = useState("");
   const [ranges, setRanges] = useState("");
 
@@ -51,11 +51,9 @@ export default function Home() {
       if (ext && !isExcluded(ext, excludedList, rangeList)) {
         const date = row["Call Date"];
 
-        // Summary
         if (!summary[date]) summary[date] = { total: 0 };
         summary[date].total++;
 
-        // Detail
         detail.push({
           Date: date,
           Extension: ext
@@ -63,7 +61,7 @@ export default function Home() {
       }
     });
 
-    const formatted = Object.entries(summary).map(([date, val]: any) => {
+    const formattedSummary = Object.entries(summary).map(([date, val]: any) => {
       const d = new Date(date);
       return {
         Day: d.toLocaleDateString("en-US", { weekday: "long" }),
@@ -72,50 +70,88 @@ export default function Home() {
       };
     });
 
-    setResults(formatted);
-    setRawData(detail);
+    setSummaryData(formattedSummary);
+    setDetailData(detail);
   }
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    // Tab 1
-    const ws1 = XLSX.utils.json_to_sheet(results);
+    const ws1 = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
-    // Tab 2
-    const ws2 = XLSX.utils.json_to_sheet(rawData);
+    const ws2 = XLSX.utils.json_to_sheet(detailData);
     XLSX.utils.book_append_sheet(wb, ws2, "Details");
 
     XLSX.writeFile(wb, "call_report.xlsx");
   }
 
-  const totalCalls = results
-    ? results.reduce((sum: number, r: any) => sum + r.Total, 0)
-    : 0;
+  const totalCalls = summaryData.reduce((sum, r) => sum + r.Total, 0);
 
   return (
-    <div style={{ backgroundColor: "#f9fafb", minHeight: "100vh", padding: 40 }}>
-      <div style={{ maxWidth: 900, margin: "auto", background: "white", padding: 30, borderRadius: 12 }}>
+    <div style={{
+      backgroundColor: "#f9fafb",
+      minHeight: "100vh",
+      padding: 40,
+      fontFamily: "Arial",
+      color: "#111"
+    }}>
+      <div style={{
+        maxWidth: 900,
+        margin: "auto",
+        background: "white",
+        padding: 30,
+        borderRadius: 12
+      }}>
         <h1>📞 Call Dashboard</h1>
 
-        {results && (
-          <div style={{ marginTop: 20 }}>
+        {/* SUMMARY CARD */}
+        {summaryData.length > 0 && (
+          <div style={{
+            background: "#f3f4f6",
+            padding: 15,
+            borderRadius: 8,
+            marginTop: 15
+          }}>
             <strong>Total Calls: {totalCalls}</strong>
           </div>
         )}
 
-        <input placeholder="Exclude extensions" onChange={e => setExcluded(e.target.value)} />
-        <br /><br />
-        <input placeholder="Exclude ranges" onChange={e => setRanges(e.target.value)} />
-        <br /><br />
-        <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} />
+        <div style={{ marginTop: 20 }}>
+          <input placeholder="Exclude extensions" onChange={e => setExcluded(e.target.value)} />
+          <br /><br />
+          <input placeholder="Exclude ranges" onChange={e => setRanges(e.target.value)} />
+          <br /><br />
+          <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} />
+        </div>
 
-        {results && (
-          <>
-            <br /><br />
-            <button onClick={downloadExcel}>Download Excel (2 Tabs)</button>
-          </>
+        {/* DOWNLOAD */}
+        {summaryData.length > 0 && (
+          <button onClick={downloadExcel} style={{ marginTop: 20 }}>
+            Download Excel
+          </button>
+        )}
+
+        {/* TABLE BACK */}
+        {summaryData.length > 0 && (
+          <table style={{ marginTop: 20, width: "100%" }}>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Date</th>
+                <th>Total Calls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summaryData.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.Day}</td>
+                  <td>{r.Date}</td>
+                  <td>{r.Total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
