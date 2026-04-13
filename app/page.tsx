@@ -39,7 +39,7 @@ export default function Home() {
 
     let summary: any = {};
 
-    parsed.forEach(row => {
+    parsed.forEach((row: any) => {
       const ext = row["To User"]?.toString().trim();
 
       if (ext && !isExcluded(ext, excludedList, rangeList)) {
