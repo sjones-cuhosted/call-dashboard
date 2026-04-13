@@ -11,6 +11,9 @@ export default function Home() {
   const [excluded, setExcluded] = useState("");
   const [ranges, setRanges] = useState("");
 
+  const [voicemails, setVoicemails] = useState(0);
+  const [callbacks, setCallbacks] = useState(0);
+
   function parseFilters() {
     const excludedList = excluded.split(",").map(x => x.trim()).filter(Boolean).map(Number);
 
@@ -45,19 +48,39 @@ export default function Home() {
     let summary: any = {};
     let detail: any[] = [];
 
+    let vmCount = 0;
+    let callMap: any = {};
+    let callbackCount = 0;
+
     parsed.forEach((row: any) => {
       const ext = row["To User"]?.toString().trim();
+      const disposition = row["Disposition"] || "";
+      const caller = row["From"] || "";
 
       if (ext && !isExcluded(ext, excludedList, rangeList)) {
         const date = row["Call Date"];
 
+        // Summary
         if (!summary[date]) summary[date] = { total: 0 };
         summary[date].total++;
 
+        // Detail
         detail.push({
           Date: date,
           Extension: ext
         });
+
+        // Voicemail
+        if (disposition.toLowerCase().includes("vmail")) {
+          vmCount++;
+        }
+
+        // Callback tracking
+        if (!callMap[caller]) {
+          callMap[caller] = 1;
+        } else {
+          callbackCount++;
+        }
       }
     });
 
@@ -72,6 +95,8 @@ export default function Home() {
 
     setSummaryData(formattedSummary);
     setDetailData(detail);
+    setVoicemails(vmCount);
+    setCallbacks(callbackCount);
   }
 
   function downloadExcel() {
@@ -92,48 +117,41 @@ export default function Home() {
     <div style={outer}>
       <div style={card}>
 
-        {/* HEADER */}
         <div style={header}>
           <img src="/logo.png" style={logo} />
-          <h1 style={{ margin: 0, color: "#111" }}>Call Dashboard</h1>
+          <h1>Call Dashboard</h1>
         </div>
 
-        {/* SUMMARY */}
+        {/* 🔥 STATS CARDS */}
         {summaryData.length > 0 && (
-          <div style={summaryBox}>
-            Total Calls: <strong>{totalCalls}</strong>
+          <div style={statsRow}>
+            <div style={statCard}>
+              <h3>Total</h3>
+              <p>{totalCalls}</p>
+            </div>
+            <div style={statCard}>
+              <h3>Voicemail</h3>
+              <p>{voicemails}</p>
+            </div>
+            <div style={statCard}>
+              <h3>Callbacks</h3>
+              <p>{callbacks}</p>
+            </div>
           </div>
         )}
 
-        {/* INPUTS */}
         <div style={{ marginTop: 20 }}>
-          <input
-            placeholder="Exclude extensions (300,800)"
-            onChange={e => setExcluded(e.target.value)}
-            style={input}
-          />
-
-          <input
-            placeholder="Exclude ranges (400-499)"
-            onChange={e => setRanges(e.target.value)}
-            style={input}
-          />
-
-          <input
-            type="file"
-            onChange={e => handleFile(e.target.files?.[0] as File)}
-            style={{ marginTop: 10, color: "#111" }}
-          />
+          <input placeholder="Exclude extensions (300,800)" onChange={e => setExcluded(e.target.value)} style={input} />
+          <input placeholder="Exclude ranges (400-499)" onChange={e => setRanges(e.target.value)} style={input} />
+          <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} />
         </div>
 
-        {/* DOWNLOAD */}
         {summaryData.length > 0 && (
           <button onClick={downloadExcel} style={button}>
             Download Excel
           </button>
         )}
 
-        {/* TABLE */}
         {summaryData.length > 0 && (
           <table style={table}>
             <thead>
@@ -160,80 +178,25 @@ export default function Home() {
   );
 }
 
-/* 🎨 STYLES */
+/* STYLES */
 
-const outer = {
-  backgroundColor: "#f3f4f6",
-  minHeight: "100vh",
-  padding: 40,
-  color: "#111",
-};
+const outer = { backgroundColor: "#f3f4f6", minHeight: "100vh", padding: 40 };
+const card = { maxWidth: 900, margin: "auto", background: "white", padding: 30, borderRadius: 12 };
+const header = { display: "flex", alignItems: "center", gap: 15 };
+const logo = { height: 45 };
 
-const card = {
-  maxWidth: 900,
-  margin: "auto",
-  background: "white",
-  padding: 30,
-  borderRadius: 12,
-  boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
-};
-
-const header = {
-  display: "flex",
-  alignItems: "center",
-  gap: 15,
-  borderBottom: "1px solid #eee",
-  paddingBottom: 10,
-};
-
-const logo = {
-  height: 45,
-};
-
-const summaryBox = {
-  marginTop: 20,
-  padding: 15,
+const statsRow = { display: "flex", gap: 15, marginTop: 20 };
+const statCard = {
+  flex: 1,
   background: "#f9fafb",
-  border: "1px solid #e5e7eb",
+  padding: 15,
   borderRadius: 8,
-  color: "#111",
+  textAlign: "center" as const
 };
 
-const input = {
-  width: "100%",
-  padding: 10,
-  marginTop: 10,
-  borderRadius: 6,
-  border: "1px solid #ccc",
-  color: "#111", // 🔥 FIX
-  backgroundColor: "#fff",
-};
+const input = { width: "100%", padding: 10, marginTop: 10 };
+const button = { marginTop: 15, padding: 10 };
 
-const button = {
-  marginTop: 15,
-  padding: "10px 15px",
-  background: "#2563eb",
-  color: "white",
-  border: "none",
-  borderRadius: 6,
-  cursor: "pointer",
-};
-
-const table = {
-  width: "100%",
-  marginTop: 20,
-  borderCollapse: "collapse" as const,
-};
-
-const th = {
-  borderBottom: "2px solid #ddd",
-  padding: 10,
-  textAlign: "left" as const,
-  color: "#111",
-};
-
-const td = {
-  borderBottom: "1px solid #eee",
-  padding: 10,
-  color: "#111",
-};
+const table = { width: "100%", marginTop: 20 };
+const th = { textAlign: "left" as const };
+const td = {};
