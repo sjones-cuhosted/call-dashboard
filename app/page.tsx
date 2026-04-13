@@ -101,11 +101,17 @@ export default function Home() {
         margin: "auto",
         background: "white",
         padding: 30,
-        borderRadius: 12
+        borderRadius: 12,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
       }}>
-        <h1>📞 Call Dashboard</h1>
 
-        {/* SUMMARY CARD */}
+        {/* 🔥 HEADER WITH LOGO */}
+        <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
+          <img src="/logo.png" alt="logo" style={{ height: 50 }} />
+          <h1 style={{ margin: 0 }}>Call Dashboard</h1>
+        </div>
+
+        {/* SUMMARY */}
         {summaryData.length > 0 && (
           <div style={{
             background: "#f3f4f6",
@@ -118,9 +124,9 @@ export default function Home() {
         )}
 
         <div style={{ marginTop: 20 }}>
-          <input placeholder="Exclude extensions" onChange={e => setExcluded(e.target.value)} />
+          <input placeholder="Exclude extensions (300,800)" onChange={e => setExcluded(e.target.value)} />
           <br /><br />
-          <input placeholder="Exclude ranges" onChange={e => setRanges(e.target.value)} />
+          <input placeholder="Exclude ranges (400-499)" onChange={e => setRanges(e.target.value)} />
           <br /><br />
           <input type="file" onChange={e => handleFile(e.target.files?.[0] as File)} />
         </div>
@@ -132,7 +138,7 @@ export default function Home() {
           </button>
         )}
 
-        {/* TABLE BACK */}
+        {/* TABLE */}
         {summaryData.length > 0 && (
           <table style={{ marginTop: 20, width: "100%" }}>
             <thead>
@@ -153,6 +159,7 @@ export default function Home() {
             </tbody>
           </table>
         )}
+
       </div>
     </div>
   );
