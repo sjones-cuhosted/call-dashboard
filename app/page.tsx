@@ -14,14 +14,15 @@ export default function Home() {
   function parseFilters() {
     const excludedList = excluded
       .split(",")
-      .map(x => x.trim())
+      .map((x) => x.trim())
       .filter(Boolean)
       .map(Number);
 
     const rangeList = ranges
       .split(",")
+      .map((r) => r.trim())
       .filter(Boolean)
-      .map(r => {
+      .map((r) => {
         const [start, end] = r.split("-").map(Number);
         return { start, end };
       });
@@ -34,9 +35,11 @@ export default function Home() {
 
     if (isNaN(num)) return true;
 
+    // exact excludes
     if (excludedList.includes(num)) return true;
 
-    for (let r of rangeList) {
+    // range excludes
+    for (const r of rangeList) {
       if (num >= r.start && num <= r.end) {
         return true;
       }
@@ -63,9 +66,17 @@ export default function Home() {
 
       if (!ext) return;
 
+      // 🔥 FILTERING
       if (isExcluded(ext, excludedList, rangeList)) return;
 
-      const disposition = (row["Disposition"] || "").toLowerCase();
+      const disposition = (
+        row["Disposition"] ||
+        row["Call Result"] ||
+        row["Status"] ||
+        ""
+      )
+        .toString()
+        .toLowerCase();
 
       if (!extMap[ext]) {
         extMap[ext] = {
@@ -78,9 +89,12 @@ export default function Home() {
 
       extMap[ext].Total++;
 
+      // 🔥 BETTER VM DETECTION
       if (
+        disposition.includes("vm") ||
         disposition.includes("vmail") ||
-        disposition.includes("voicemail")
+        disposition.includes("voicemail") ||
+        disposition.includes("mailbox")
       ) {
         extMap[ext].Voicemail++;
       } else {
@@ -90,7 +104,7 @@ export default function Home() {
       detail.push({
         Date: new Date(row["Call Date"]).toLocaleDateString("en-US"),
         Extension: ext,
-        Disposition: disposition,
+        Result: disposition,
       });
     });
 
@@ -105,11 +119,9 @@ export default function Home() {
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    // Summary Tab
     const ws1 = XLSX.utils.json_to_sheet(extensionStats);
     XLSX.utils.book_append_sheet(wb, ws1, "Extension Summary");
 
-    // Detail Tab
     const ws2 = XLSX.utils.json_to_sheet(detailData);
     XLSX.utils.book_append_sheet(wb, ws2, "Details");
 
@@ -121,13 +133,13 @@ export default function Home() {
     0
   );
 
-  const totalVM = extensionStats.reduce(
-    (sum, r) => sum + r.Voicemail,
+  const totalAnswered = extensionStats.reduce(
+    (sum, r) => sum + r.Answered,
     0
   );
 
-  const totalAnswered = extensionStats.reduce(
-    (sum, r) => sum + r.Answered,
+  const totalVM = extensionStats.reduce(
+    (sum, r) => sum + r.Voicemail,
     0
   );
 
@@ -135,7 +147,6 @@ export default function Home() {
     <div style={outer}>
       <div style={card}>
 
-        {/* HEADER */}
         <div style={header}>
           <img src="/logo.png" style={logo} />
           <h1 style={title}>Call Dashboard</h1>
@@ -155,21 +166,21 @@ export default function Home() {
           <Label text="Exclude Extensions" />
           <input
             placeholder="300,800"
-            onChange={e => setExcluded(e.target.value)}
+            onChange={(e) => setExcluded(e.target.value)}
             style={input}
           />
 
           <Label text="Exclude Ranges" />
           <input
             placeholder="400-499,700-799"
-            onChange={e => setRanges(e.target.value)}
+            onChange={(e) => setRanges(e.target.value)}
             style={input}
           />
 
           <Label text="Upload Call Records CSV" />
           <input
             type="file"
-            onChange={e =>
+            onChange={(e) =>
               handleFile(e.target.files?.[0] as File)
             }
             style={fileInput}
@@ -186,8 +197,8 @@ export default function Home() {
         {/* TABLE */}
         {extensionStats.length > 0 && (
           <table style={table}>
-            <thead>
-              <tr style={thead}>
+            <thead style={thead}>
+              <tr>
                 <th style={th}>Extension</th>
                 <th style={th}>Total Calls</th>
                 <th style={th}>Answered</th>
@@ -260,7 +271,6 @@ const logo = {
 const title = {
   margin: 0,
   color: "#111",
-  fontWeight: 600,
 };
 
 const statsRow = {
@@ -314,7 +324,6 @@ const button = {
   color: "white",
   border: "none",
   borderRadius: 6,
-  cursor: "pointer",
 };
 
 const table = {
