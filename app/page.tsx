@@ -6,34 +6,40 @@ import * as XLSX from "xlsx";
 import Papa from "papaparse";
 
 export default function Home() {
-  const [summaryData, setSummaryData] = useState<any[]>([]);
+  const [extensionStats, setExtensionStats] = useState<any[]>([]);
   const [detailData, setDetailData] = useState<any[]>([]);
   const [excluded, setExcluded] = useState("");
   const [ranges, setRanges] = useState("");
 
-  const [voicemails, setVoicemails] = useState(0);
-  const [callbacks, setCallbacks] = useState(0);
-
   function parseFilters() {
-    const excludedList = excluded.split(",").map(x => x.trim()).filter(Boolean).map(Number);
+    const excludedList = excluded
+      .split(",")
+      .map(x => x.trim())
+      .filter(Boolean)
+      .map(Number);
 
-    const rangeList = ranges.split(",").map(r => {
-      const [start, end] = r.split("-").map(Number);
-      return { start, end };
-    });
+    const rangeList = ranges
+      .split(",")
+      .filter(Boolean)
+      .map(r => {
+        const [start, end] = r.split("-").map(Number);
+        return { start, end };
+      });
 
     return { excludedList, rangeList };
   }
 
   function isExcluded(ext: string, excludedList: number[], rangeList: any[]) {
-    if (!ext) return true;
     const num = parseInt(ext);
+
     if (isNaN(num)) return true;
 
     if (excludedList.includes(num)) return true;
 
     for (let r of rangeList) {
-      if (num >= r.start && num <= r.end) return true;
+      if (num >= r.start && num <= r.end) {
+        return true;
+      }
     }
 
     return false;
@@ -41,73 +47,89 @@ export default function Home() {
 
   async function handleFile(file: File) {
     const text = await file.text();
-    const parsed = Papa.parse<any>(text, { header: true }).data;
+
+    const parsed = Papa.parse<any>(text, {
+      header: true,
+      skipEmptyLines: true,
+    }).data;
 
     const { excludedList, rangeList } = parseFilters();
 
-    let summary: any = {};
+    let extMap: any = {};
     let detail: any[] = [];
-
-    let vmCount = 0;
-    let callMap: any = {};
-    let callbackCount = 0;
 
     parsed.forEach((row: any) => {
       const ext = row["To User"]?.toString().trim();
-      const disposition = row["Disposition"] || "";
-      const caller = row["From"] || "";
 
-      if (ext && !isExcluded(ext, excludedList, rangeList)) {
-        const date = row["Call Date"];
+      if (!ext) return;
 
-        if (!summary[date]) summary[date] = { total: 0 };
-        summary[date].total++;
+      if (isExcluded(ext, excludedList, rangeList)) return;
 
-        detail.push({
-          Date: date,
-          Extension: ext
-        });
+      const disposition = (row["Disposition"] || "").toLowerCase();
 
-        if (disposition.toLowerCase().includes("vmail")) {
-          vmCount++;
-        }
-
-        if (!callMap[caller]) {
-          callMap[caller] = 1;
-        } else {
-          callbackCount++;
-        }
+      if (!extMap[ext]) {
+        extMap[ext] = {
+          Extension: ext,
+          Total: 0,
+          Answered: 0,
+          Voicemail: 0,
+        };
       }
+
+      extMap[ext].Total++;
+
+      if (
+        disposition.includes("vmail") ||
+        disposition.includes("voicemail")
+      ) {
+        extMap[ext].Voicemail++;
+      } else {
+        extMap[ext].Answered++;
+      }
+
+      detail.push({
+        Date: new Date(row["Call Date"]).toLocaleDateString("en-US"),
+        Extension: ext,
+        Disposition: disposition,
+      });
     });
 
-    const formattedSummary = Object.entries(summary).map(([date, val]: any) => {
-      const d = new Date(date);
-      return {
-        Day: d.toLocaleDateString("en-US", { weekday: "long" }),
-        Date: d.toLocaleDateString("en-US"),
-        Total: val.total
-      };
-    });
+    const stats = Object.values(extMap).sort(
+      (a: any, b: any) => b.Total - a.Total
+    );
 
-    setSummaryData(formattedSummary);
+    setExtensionStats(stats);
     setDetailData(detail);
-    setVoicemails(vmCount);
-    setCallbacks(callbackCount);
   }
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    const ws1 = XLSX.utils.json_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(wb, ws1, "Summary");
+    // Summary Tab
+    const ws1 = XLSX.utils.json_to_sheet(extensionStats);
+    XLSX.utils.book_append_sheet(wb, ws1, "Extension Summary");
 
+    // Detail Tab
     const ws2 = XLSX.utils.json_to_sheet(detailData);
     XLSX.utils.book_append_sheet(wb, ws2, "Details");
 
     XLSX.writeFile(wb, "call_report.xlsx");
   }
 
-  const totalCalls = summaryData.reduce((sum, r) => sum + r.Total, 0);
+  const totalCalls = extensionStats.reduce(
+    (sum, r) => sum + r.Total,
+    0
+  );
+
+  const totalVM = extensionStats.reduce(
+    (sum, r) => sum + r.Voicemail,
+    0
+  );
+
+  const totalAnswered = extensionStats.reduce(
+    (sum, r) => sum + r.Answered,
+    0
+  );
 
   return (
     <div style={outer}>
@@ -120,61 +142,66 @@ export default function Home() {
         </div>
 
         {/* STATS */}
-        {summaryData.length > 0 && (
+        {extensionStats.length > 0 && (
           <div style={statsRow}>
             <Stat label="Total Calls" value={totalCalls} />
-            <Stat label="Voicemails" value={voicemails} />
-            <Stat label="Callbacks" value={callbacks} />
+            <Stat label="Answered" value={totalAnswered} />
+            <Stat label="Voicemails" value={totalVM} />
           </div>
         )}
 
-        {/* INPUTS */}
-        <div style={form}>
+        {/* FILTERS */}
+        <div style={{ marginTop: 25 }}>
           <Label text="Exclude Extensions" />
           <input
-            placeholder="300, 800"
+            placeholder="300,800"
             onChange={e => setExcluded(e.target.value)}
             style={input}
           />
 
           <Label text="Exclude Ranges" />
           <input
-            placeholder="400-499, 700-799"
+            placeholder="400-499,700-799"
             onChange={e => setRanges(e.target.value)}
             style={input}
           />
 
-          <Label text="Upload Call File" />
+          <Label text="Upload Call Records CSV" />
           <input
             type="file"
-            onChange={e => handleFile(e.target.files?.[0] as File)}
+            onChange={e =>
+              handleFile(e.target.files?.[0] as File)
+            }
             style={fileInput}
           />
         </div>
 
         {/* DOWNLOAD */}
-        {summaryData.length > 0 && (
+        {extensionStats.length > 0 && (
           <button onClick={downloadExcel} style={button}>
             Download Excel Report
           </button>
         )}
 
         {/* TABLE */}
-        {summaryData.length > 0 && (
+        {extensionStats.length > 0 && (
           <table style={table}>
             <thead>
-              <tr>
-                <th style={th}>Day</th>
-                <th style={th}>Date</th>
+              <tr style={thead}>
+                <th style={th}>Extension</th>
                 <th style={th}>Total Calls</th>
+                <th style={th}>Answered</th>
+                <th style={th}>Voicemail</th>
               </tr>
             </thead>
+
             <tbody>
-              {summaryData.map((r, i) => (
+              {extensionStats.map((r: any, i: number) => (
                 <tr key={i}>
-                  <td style={td}>{r.Day}</td>
-                  <td style={td}>{r.Date}</td>
+                  <td style={td}>{r.Extension}</td>
                   <td style={td}>{r.Total}</td>
+                  <td style={td}>{r.Answered}</td>
+                  <td style={td}>{r.Voicemail}</td>
                 </tr>
               ))}
             </tbody>
@@ -210,7 +237,7 @@ const outer = {
 };
 
 const card = {
-  maxWidth: 900,
+  maxWidth: 1100,
   margin: "auto",
   background: "white",
   padding: 30,
@@ -226,12 +253,13 @@ const header = {
   paddingBottom: 15,
 };
 
-const logo = { height: 45 };
+const logo = {
+  height: 45,
+};
 
 const title = {
   margin: 0,
   color: "#111",
-  fontSize: 24,
   fontWeight: 600,
 };
 
@@ -249,15 +277,21 @@ const statCard = {
   borderRadius: 10,
 };
 
-const statLabel = { fontSize: 13, color: "#666" };
-const statValue = { fontSize: 22, fontWeight: "bold", color: "#111" };
+const statLabel = {
+  fontSize: 13,
+  color: "#666",
+};
 
-const form = { marginTop: 25 };
+const statValue = {
+  fontSize: 24,
+  fontWeight: "bold",
+  color: "#111",
+};
 
 const label = {
   fontSize: 13,
-  color: "#555",
   marginBottom: 5,
+  color: "#555",
 };
 
 const input = {
@@ -270,13 +304,11 @@ const input = {
 };
 
 const fileInput = {
-  marginTop: 5,
-  marginBottom: 15,
+  marginBottom: 20,
   color: "#111",
 };
 
 const button = {
-  marginTop: 10,
   padding: "12px 18px",
   background: "#2563eb",
   color: "white",
@@ -287,17 +319,23 @@ const button = {
 
 const table = {
   width: "100%",
-  marginTop: 20,
+  marginTop: 25,
   borderCollapse: "collapse" as const,
+};
+
+const thead = {
+  background: "#f3f4f6",
 };
 
 const th = {
   textAlign: "left" as const,
+  padding: 12,
+  color: "#111",
   borderBottom: "2px solid #e5e7eb",
-  padding: 10,
 };
 
 const td = {
-  padding: 10,
+  padding: 12,
   borderBottom: "1px solid #f1f1f1",
+  color: "#111",
 };
