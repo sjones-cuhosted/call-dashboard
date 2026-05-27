@@ -11,6 +11,8 @@ export default function Home() {
   const [excluded, setExcluded] = useState("");
   const [ranges, setRanges] = useState("");
 
+  const [uniqueCallbacks, setUniqueCallbacks] = useState(0);
+
   function parseFilters() {
     const excludedList = excluded
       .split(",")
@@ -63,6 +65,10 @@ export default function Home() {
     let extMap: any = {};
     let detail: any[] = [];
 
+    // 🔥 CALLBACK TRACKING
+    let callerMap: any = {};
+    let resolvedCallbacks = new Set();
+
     parsed.forEach((row: any) => {
       const ext = row["To User"]?.toString().trim();
 
@@ -70,7 +76,8 @@ export default function Home() {
 
       if (isExcluded(ext, excludedList, rangeList)) return;
 
-      // 🔥 THIS IS THE IMPORTANT FIELD
+      const caller = (row["From"] || "").toString().trim();
+
       const toField = (row["To"] || "")
         .toString()
         .toLowerCase();
@@ -87,24 +94,53 @@ export default function Home() {
 
       extMap[ext].Total++;
 
-      // 🔥 BUSINESS LOGIC
+      // 🔥 VOICEMAIL
       if (toField.includes("vmail")) {
         extMap[ext].Voicemail++;
+
+        if (!callerMap[caller]) {
+          callerMap[caller] = {
+            missed: true,
+            resolved: false,
+          };
+        }
       }
+
+      // 🔥 HUNG UP
       else if (
         toField.includes("speakaccount") ||
         toField.includes("system")
       ) {
         extMap[ext].HungUp++;
+
+        if (!callerMap[caller]) {
+          callerMap[caller] = {
+            missed: true,
+            resolved: false,
+          };
+        }
       }
+
+      // 🔥 ANSWERED
       else {
         extMap[ext].Answered++;
+
+        // caller previously missed?
+        if (
+          callerMap[caller] &&
+          callerMap[caller].missed &&
+          !callerMap[caller].resolved
+        ) {
+          callerMap[caller].resolved = true;
+          resolvedCallbacks.add(caller);
+        }
       }
 
       detail.push({
         Date: new Date(row["Call Date"]).toLocaleDateString("en-US"),
         Extension: ext,
         Result: row["To"],
+        Caller: caller,
       });
     });
 
@@ -114,16 +150,17 @@ export default function Home() {
 
     setExtensionStats(stats);
     setDetailData(detail);
+    setUniqueCallbacks(resolvedCallbacks.size);
   }
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    // SUMMARY TAB
+    // SUMMARY
     const ws1 = XLSX.utils.json_to_sheet(extensionStats);
     XLSX.utils.book_append_sheet(wb, ws1, "Extension Summary");
 
-    // DETAILS TAB
+    // DETAILS
     const ws2 = XLSX.utils.json_to_sheet(detailData);
     XLSX.utils.book_append_sheet(wb, ws2, "Details");
 
@@ -167,6 +204,7 @@ export default function Home() {
             <Stat label="Answered" value={totalAnswered} />
             <Stat label="Voicemails" value={totalVM} />
             <Stat label="Hung Up" value={totalHungUp} />
+            <Stat label="Callbacks" value={uniqueCallbacks} />
           </div>
         )}
 
@@ -209,7 +247,7 @@ export default function Home() {
             <thead style={thead}>
               <tr>
                 <th style={th}>Extension</th>
-                <th style={th}>Total Calls</th>
+                <th style={th}>Total</th>
                 <th style={th}>Answered</th>
                 <th style={th}>Voicemail</th>
                 <th style={th}>Hung Up</th>
@@ -289,10 +327,12 @@ const statsRow = {
   display: "flex",
   gap: 15,
   marginTop: 20,
+  flexWrap: "wrap" as const,
 };
 
 const statCard = {
   flex: 1,
+  minWidth: 160,
   background: "#f9fafb",
   border: "1px solid #e5e7eb",
   padding: 15,
