@@ -39,10 +39,8 @@ export default function Home() {
 
     if (isNaN(num)) return true;
 
-    // exact excludes
     if (excludedList.includes(num)) return true;
 
-    // range excludes
     for (const r of rangeList) {
       if (num >= r.start && num <= r.end) {
         return true;
@@ -70,15 +68,10 @@ export default function Home() {
 
       if (!ext) return;
 
-      // EXCLUSIONS
       if (isExcluded(ext, excludedList, rangeList)) return;
 
-      const disposition = (
-        row["Disposition"] ||
-        row["Call Result"] ||
-        row["Status"] ||
-        ""
-      )
+      // 🔥 THIS IS THE IMPORTANT FIELD
+      const toField = (row["To"] || "")
         .toString()
         .toLowerCase();
 
@@ -94,13 +87,13 @@ export default function Home() {
 
       extMap[ext].Total++;
 
-      // BUSINESS LOGIC
-      if (disposition.includes("vmail")) {
+      // 🔥 BUSINESS LOGIC
+      if (toField.includes("vmail")) {
         extMap[ext].Voicemail++;
       }
       else if (
-        disposition.includes("speakaccount") ||
-        disposition.includes("system")
+        toField.includes("speakaccount") ||
+        toField.includes("system")
       ) {
         extMap[ext].HungUp++;
       }
@@ -111,7 +104,7 @@ export default function Home() {
       detail.push({
         Date: new Date(row["Call Date"]).toLocaleDateString("en-US"),
         Extension: ext,
-        Result: disposition,
+        Result: row["To"],
       });
     });
 
