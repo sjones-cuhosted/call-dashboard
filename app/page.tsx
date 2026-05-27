@@ -51,6 +51,55 @@ export default function Home() {
     return false;
   }
 
+  function cleanNumber(value: string) {
+    return value.replace(/\D/g, "");
+  }
+
+  function isInternalDial(dialed: string) {
+    const d = dialed.toLowerCase();
+
+    return (
+      d.includes("x721") ||
+      d.includes("x722") ||
+      d.includes("x723")
+    );
+  }
+
+  function isOutboundCall(
+    from: string,
+    fromName: string,
+    dialed: string
+  ) {
+    const cleanFrom = cleanNumber(from);
+    const cleanDialed = cleanNumber(dialed);
+
+    //
+    // RULE 1
+    // Main office number dialing out
+    //
+    if (
+      cleanFrom === "9723149330" &&
+      !isInternalDial(dialed)
+    ) {
+      return true;
+    }
+
+    //
+    // RULE 2
+    // Extension/user dialing 10 digit number
+    //
+    const extensionPattern = /^\d{3,4}$/;
+
+    if (
+      extensionPattern.test(fromName.trim()) &&
+      cleanDialed.length === 10
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
   async function handleFile(file: File) {
     const text = await file.text();
 
@@ -63,34 +112,56 @@ export default function Home() {
 
     let extMap: any = {};
 
-    // Track missed callers
+    //
+    // TRACK MISSED CALLERS
+    //
     let missedCallers = new Set<string>();
 
-    // Track callbacks already counted
+    //
+    // TRACK UNIQUE CALLBACKS
+    //
     let callbackTracker = new Set<string>();
 
     parsed.forEach((row: any) => {
       const toUser = row["To User"]?.toString().trim();
       const fromUser = row["From User"]?.toString().trim();
 
+      const from = (row["From"] || "").toString();
+      const fromName = (row["From Name"] || "").toString();
+      const dialed = (row["Dialed"] || "").toString();
+
+      const cleanFrom = cleanNumber(from);
+      const cleanDialed = cleanNumber(dialed);
+
       const toField = (row["To"] || "")
         .toString()
         .toLowerCase();
 
-      const caller = (row["From"] || "")
-        .toString()
-        .replace(/\D/g, "");
-
-      const dialed = (row["Dialed"] || "")
-        .toString()
-        .replace(/\D/g, "");
+      //
+      // =====================================
+      // OUTBOUND CALL DETECTION
+      // =====================================
+      //
+      const outbound = isOutboundCall(
+        from,
+        fromName,
+        dialed
+      );
 
       //
-      // =========================
-      // INBOUND CALLS
-      // =========================
+      // =====================================
+      // INBOUND PROCESSING
+      // =====================================
       //
-      if (toUser && !isExcluded(toUser, excludedList, rangeList)) {
+      if (
+        !outbound &&
+        toUser &&
+        !isExcluded(
+          toUser,
+          excludedList,
+          rangeList
+        )
+      ) {
 
         if (!extMap[toUser]) {
           extMap[toUser] = {
@@ -105,35 +176,52 @@ export default function Home() {
 
         extMap[toUser].Total++;
 
+        //
         // VOICEMAIL
+        //
         if (toField.includes("vmail")) {
           extMap[toUser].Voicemail++;
-          missedCallers.add(caller);
+
+          if (cleanFrom.length === 10) {
+            missedCallers.add(cleanFrom);
+          }
         }
 
+        //
         // HUNG UP
+        //
         else if (
           toField.includes("speakaccount") ||
           toField.includes("system")
         ) {
           extMap[toUser].HungUp++;
-          missedCallers.add(caller);
+
+          if (cleanFrom.length === 10) {
+            missedCallers.add(cleanFrom);
+          }
         }
 
+        //
         // ANSWERED
+        //
         else {
           extMap[toUser].Answered++;
         }
       }
 
       //
-      // =========================
-      // OUTBOUND CALLBACKS
-      // =========================
+      // =====================================
+      // CALLBACK PROCESSING
+      // =====================================
       //
       if (
+        outbound &&
         fromUser &&
-        !isExcluded(fromUser, excludedList, rangeList)
+        !isExcluded(
+          fromUser,
+          excludedList,
+          rangeList
+        )
       ) {
 
         if (!extMap[fromUser]) {
@@ -147,14 +235,16 @@ export default function Home() {
           };
         }
 
-        // Was this outbound number previously missed?
+        //
+        // CALLBACK MATCH
+        //
         if (
-          missedCallers.has(dialed) &&
-          !callbackTracker.has(dialed)
+          missedCallers.has(cleanDialed) &&
+          !callbackTracker.has(cleanDialed)
         ) {
           extMap[fromUser].Callbacks++;
 
-          callbackTracker.add(dialed);
+          callbackTracker.add(cleanDialed);
         }
       }
     });
@@ -170,7 +260,9 @@ export default function Home() {
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    const ws1 = XLSX.utils.json_to_sheet(extensionStats);
+    const ws1 = XLSX.utils.json_to_sheet(
+      extensionStats
+    );
 
     XLSX.utils.book_append_sheet(
       wb,
@@ -225,24 +317,33 @@ export default function Home() {
         {/* FILTERS */}
         <div style={{ marginTop: 25 }}>
           <Label text="Exclude Extensions" />
+
           <input
             placeholder="300,800"
-            onChange={(e) => setExcluded(e.target.value)}
+            onChange={(e) =>
+              setExcluded(e.target.value)
+            }
             style={input}
           />
 
           <Label text="Exclude Ranges" />
+
           <input
             placeholder="400-499,700-799"
-            onChange={(e) => setRanges(e.target.value)}
+            onChange={(e) =>
+              setRanges(e.target.value)
+            }
             style={input}
           />
 
           <Label text="Upload Call Records CSV" />
+
           <input
             type="file"
             onChange={(e) =>
-              handleFile(e.target.files?.[0] as File)
+              handleFile(
+                e.target.files?.[0] as File
+              )
             }
             style={fileInput}
           />
@@ -250,7 +351,10 @@ export default function Home() {
 
         {/* DOWNLOAD */}
         {extensionStats.length > 0 && (
-          <button onClick={downloadExcel} style={button}>
+          <button
+            onClick={downloadExcel}
+            style={button}
+          >
             Download Excel Report
           </button>
         )}
@@ -270,16 +374,35 @@ export default function Home() {
             </thead>
 
             <tbody>
-              {extensionStats.map((r: any, i: number) => (
-                <tr key={i}>
-                  <td style={td}>{r.Extension}</td>
-                  <td style={td}>{r.Total}</td>
-                  <td style={td}>{r.Answered}</td>
-                  <td style={td}>{r.Voicemail}</td>
-                  <td style={td}>{r.HungUp}</td>
-                  <td style={td}>{r.Callbacks}</td>
-                </tr>
-              ))}
+              {extensionStats.map(
+                (r: any, i: number) => (
+                  <tr key={i}>
+                    <td style={td}>
+                      {r.Extension}
+                    </td>
+
+                    <td style={td}>
+                      {r.Total}
+                    </td>
+
+                    <td style={td}>
+                      {r.Answered}
+                    </td>
+
+                    <td style={td}>
+                      {r.Voicemail}
+                    </td>
+
+                    <td style={td}>
+                      {r.HungUp}
+                    </td>
+
+                    <td style={td}>
+                      {r.Callbacks}
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         )}
@@ -294,14 +417,23 @@ export default function Home() {
 function Stat({ label, value }: any) {
   return (
     <div style={statCard}>
-      <div style={statLabel}>{label}</div>
-      <div style={statValue}>{value}</div>
+      <div style={statLabel}>
+        {label}
+      </div>
+
+      <div style={statValue}>
+        {value}
+      </div>
     </div>
   );
 }
 
 function Label({ text }: any) {
-  return <div style={label}>{text}</div>;
+  return (
+    <div style={label}>
+      {text}
+    </div>
+  );
 }
 
 /* STYLES */
@@ -318,14 +450,16 @@ const card = {
   background: "white",
   padding: 30,
   borderRadius: 12,
-  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+  boxShadow:
+    "0 10px 30px rgba(0,0,0,0.08)",
 };
 
 const header = {
   display: "flex",
   alignItems: "center",
   gap: 15,
-  borderBottom: "1px solid #e5e7eb",
+  borderBottom:
+    "1px solid #e5e7eb",
   paddingBottom: 15,
 };
 
@@ -350,7 +484,8 @@ const statCard = {
   flex: 1,
   minWidth: 160,
   background: "#f9fafb",
-  border: "1px solid #e5e7eb",
+  border:
+    "1px solid #e5e7eb",
   padding: 15,
   borderRadius: 10,
 };
@@ -377,7 +512,8 @@ const input = {
   padding: 12,
   marginBottom: 15,
   borderRadius: 6,
-  border: "1px solid #d1d5db",
+  border:
+    "1px solid #d1d5db",
   color: "#111",
 };
 
@@ -398,7 +534,8 @@ const button = {
 const table = {
   width: "100%",
   marginTop: 25,
-  borderCollapse: "collapse" as const,
+  borderCollapse:
+    "collapse" as const,
 };
 
 const thead = {
@@ -409,11 +546,13 @@ const th = {
   textAlign: "left" as const,
   padding: 12,
   color: "#111",
-  borderBottom: "2px solid #e5e7eb",
+  borderBottom:
+    "2px solid #e5e7eb",
 };
 
 const td = {
   padding: 12,
-  borderBottom: "1px solid #f1f1f1",
+  borderBottom:
+    "1px solid #f1f1f1",
   color: "#111",
 };
