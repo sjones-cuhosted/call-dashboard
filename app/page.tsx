@@ -11,6 +11,8 @@ export default function Home() {
   const [ranges, setRanges] = useState("");
 
   const [totalCallbacks, setTotalCallbacks] = useState(0);
+  const [vmCallbacks, setVmCallbacks] = useState(0);
+  const [hungCallbacks, setHungCallbacks] = useState(0);
 
   function parseFilters() {
     const excludedList = excluded
@@ -74,8 +76,7 @@ export default function Home() {
     const cleanDialed = cleanNumber(dialed);
 
     //
-    // RULE 1
-    // Main office number dialing out
+    // MAIN OFFICE NUMBER
     //
     if (
       cleanFrom === "9723149330" &&
@@ -85,8 +86,7 @@ export default function Home() {
     }
 
     //
-    // RULE 2
-    // Extension/user dialing 10 digit number
+    // EXTENSION CALLING 10 DIGIT #
     //
     const extensionPattern = /^\d{3,4}$/;
 
@@ -113,14 +113,16 @@ export default function Home() {
     let extMap: any = {};
 
     //
-    // TRACK MISSED CALLERS
+    // TRACK MISSED CALL TYPES
     //
-    let missedCallers = new Set<string>();
+    let vmCallers = new Set<string>();
+    let hungCallers = new Set<string>();
 
     //
-    // TRACK UNIQUE CALLBACKS
+    // PREVENT DUPLICATE CALLBACK COUNTS
     //
-    let callbackTracker = new Set<string>();
+    let vmCallbackTracker = new Set<string>();
+    let hungCallbackTracker = new Set<string>();
 
     parsed.forEach((row: any) => {
       const toUser = row["To User"]?.toString().trim();
@@ -138,9 +140,7 @@ export default function Home() {
         .toLowerCase();
 
       //
-      // =====================================
-      // OUTBOUND CALL DETECTION
-      // =====================================
+      // DETECT OUTBOUND
       //
       const outbound = isOutboundCall(
         from,
@@ -149,9 +149,9 @@ export default function Home() {
       );
 
       //
-      // =====================================
-      // INBOUND PROCESSING
-      // =====================================
+      // ===========================
+      // INBOUND
+      // ===========================
       //
       if (
         !outbound &&
@@ -170,7 +170,8 @@ export default function Home() {
             Answered: 0,
             Voicemail: 0,
             HungUp: 0,
-            Callbacks: 0,
+            VMCallbacks: 0,
+            HungCallbacks: 0,
           };
         }
 
@@ -183,7 +184,7 @@ export default function Home() {
           extMap[toUser].Voicemail++;
 
           if (cleanFrom.length === 10) {
-            missedCallers.add(cleanFrom);
+            vmCallers.add(cleanFrom);
           }
         }
 
@@ -197,7 +198,7 @@ export default function Home() {
           extMap[toUser].HungUp++;
 
           if (cleanFrom.length === 10) {
-            missedCallers.add(cleanFrom);
+            hungCallers.add(cleanFrom);
           }
         }
 
@@ -210,9 +211,9 @@ export default function Home() {
       }
 
       //
-      // =====================================
-      // CALLBACK PROCESSING
-      // =====================================
+      // ===========================
+      // CALLBACKS
+      // ===========================
       //
       if (
         outbound &&
@@ -231,20 +232,33 @@ export default function Home() {
             Answered: 0,
             Voicemail: 0,
             HungUp: 0,
-            Callbacks: 0,
+            VMCallbacks: 0,
+            HungCallbacks: 0,
           };
         }
 
         //
-        // CALLBACK MATCH
+        // VM CALLBACK
         //
         if (
-          missedCallers.has(cleanDialed) &&
-          !callbackTracker.has(cleanDialed)
+          vmCallers.has(cleanDialed) &&
+          !vmCallbackTracker.has(cleanDialed)
         ) {
-          extMap[fromUser].Callbacks++;
+          extMap[fromUser].VMCallbacks++;
 
-          callbackTracker.add(cleanDialed);
+          vmCallbackTracker.add(cleanDialed);
+        }
+
+        //
+        // HUNG UP CALLBACK
+        //
+        if (
+          hungCallers.has(cleanDialed) &&
+          !hungCallbackTracker.has(cleanDialed)
+        ) {
+          extMap[fromUser].HungCallbacks++;
+
+          hungCallbackTracker.add(cleanDialed);
         }
       }
     });
@@ -254,36 +268,54 @@ export default function Home() {
     );
 
     setExtensionStats(stats);
-    setTotalCallbacks(callbackTracker.size);
+
+    setVmCallbacks(vmCallbackTracker.size);
+
+    setHungCallbacks(hungCallbackTracker.size);
+
+    setTotalCallbacks(
+      vmCallbackTracker.size +
+      hungCallbackTracker.size
+    );
   }
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    // Clone stats
+    // EXPORT DATA
     const exportData = [...extensionStats];
 
-    // Totals row
+    // TOTALS ROW
     exportData.push({
       Extension: "TOTALS",
+
       Total: extensionStats.reduce(
         (sum, r) => sum + r.Total,
         0
       ),
+
       Answered: extensionStats.reduce(
         (sum, r) => sum + r.Answered,
         0
       ),
+
       Voicemail: extensionStats.reduce(
         (sum, r) => sum + r.Voicemail,
         0
       ),
+
       HungUp: extensionStats.reduce(
         (sum, r) => sum + r.HungUp,
         0
       ),
-      Callbacks: extensionStats.reduce(
-        (sum, r) => sum + r.Callbacks,
+
+      VMCallbacks: extensionStats.reduce(
+        (sum, r) => sum + r.VMCallbacks,
+        0
+      ),
+
+      HungCallbacks: extensionStats.reduce(
+        (sum, r) => sum + r.HungCallbacks,
         0
       ),
     });
@@ -338,7 +370,9 @@ export default function Home() {
             <Stat label="Answered" value={totalAnswered} />
             <Stat label="Voicemails" value={totalVM} />
             <Stat label="Hung Up" value={totalHungUp} />
-            <Stat label="Callbacks" value={totalCallbacks} />
+            <Stat label="VM Callbacks" value={vmCallbacks} />
+            <Stat label="Hung Callbacks" value={hungCallbacks} />
+            <Stat label="Total Callbacks" value={totalCallbacks} />
           </div>
         )}
 
@@ -397,7 +431,8 @@ export default function Home() {
                 <th style={th}>Answered</th>
                 <th style={th}>Voicemail</th>
                 <th style={th}>Hung Up</th>
-                <th style={th}>Callbacks</th>
+                <th style={th}>VM Callbacks</th>
+                <th style={th}>Hung Callbacks</th>
               </tr>
             </thead>
 
@@ -426,7 +461,11 @@ export default function Home() {
                     </td>
 
                     <td style={td}>
-                      {r.Callbacks}
+                      {r.VMCallbacks}
+                    </td>
+
+                    <td style={td}>
+                      {r.HungCallbacks}
                     </td>
                   </tr>
                 )
@@ -473,7 +512,7 @@ const outer = {
 };
 
 const card = {
-  maxWidth: 1300,
+  maxWidth: 1450,
   margin: "auto",
   background: "white",
   padding: 30,
