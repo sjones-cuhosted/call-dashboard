@@ -63,73 +63,98 @@ export default function Home() {
 
     let extMap: any = {};
 
-    // caller tracking
-    let callerHistory: any = {};
+    // Track missed callers
+    let missedCallers = new Set<string>();
 
-    // unique callbacks
-    let callbackSet = new Set();
+    // Track callbacks already counted
+    let callbackTracker = new Set<string>();
 
     parsed.forEach((row: any) => {
-      const ext = row["To User"]?.toString().trim();
-
-      if (!ext) return;
-
-      if (isExcluded(ext, excludedList, rangeList)) return;
-
-      const caller = (row["From"] || "")
-        .toString()
-        .trim();
+      const toUser = row["To User"]?.toString().trim();
+      const fromUser = row["From User"]?.toString().trim();
 
       const toField = (row["To"] || "")
         .toString()
         .toLowerCase();
 
-      if (!extMap[ext]) {
-        extMap[ext] = {
-          Extension: ext,
-          Total: 0,
-          Answered: 0,
-          Voicemail: 0,
-          HungUp: 0,
-          Callbacks: 0,
-        };
-      }
+      const caller = (row["From"] || "")
+        .toString()
+        .replace(/\D/g, "");
 
-      extMap[ext].Total++;
+      const dialed = (row["Dialed"] || "")
+        .toString()
+        .replace(/\D/g, "");
 
-      // VOICEMAIL
-      if (toField.includes("vmail")) {
-        extMap[ext].Voicemail++;
+      //
+      // =========================
+      // INBOUND CALLS
+      // =========================
+      //
+      if (toUser && !isExcluded(toUser, excludedList, rangeList)) {
 
-        callerHistory[caller] = {
-          missed: true,
-        };
-      }
+        if (!extMap[toUser]) {
+          extMap[toUser] = {
+            Extension: toUser,
+            Total: 0,
+            Answered: 0,
+            Voicemail: 0,
+            HungUp: 0,
+            Callbacks: 0,
+          };
+        }
 
-      // HUNG UP
-      else if (
-        toField.includes("speakaccount") ||
-        toField.includes("system")
-      ) {
-        extMap[ext].HungUp++;
+        extMap[toUser].Total++;
 
-        callerHistory[caller] = {
-          missed: true,
-        };
-      }
+        // VOICEMAIL
+        if (toField.includes("vmail")) {
+          extMap[toUser].Voicemail++;
+          missedCallers.add(caller);
+        }
 
-      // ANSWERED
-      else {
-        extMap[ext].Answered++;
-
-        // callback logic
-        if (
-          callerHistory[caller] &&
-          callerHistory[caller].missed &&
-          !callbackSet.has(caller)
+        // HUNG UP
+        else if (
+          toField.includes("speakaccount") ||
+          toField.includes("system")
         ) {
-          extMap[ext].Callbacks++;
-          callbackSet.add(caller);
+          extMap[toUser].HungUp++;
+          missedCallers.add(caller);
+        }
+
+        // ANSWERED
+        else {
+          extMap[toUser].Answered++;
+        }
+      }
+
+      //
+      // =========================
+      // OUTBOUND CALLBACKS
+      // =========================
+      //
+      if (
+        fromUser &&
+        !isExcluded(fromUser, excludedList, rangeList)
+      ) {
+
+        if (!extMap[fromUser]) {
+          extMap[fromUser] = {
+            Extension: fromUser,
+            Total: 0,
+            Answered: 0,
+            Voicemail: 0,
+            HungUp: 0,
+            Callbacks: 0,
+          };
+        }
+
+        // Was this outbound number previously missed?
+        if (
+          missedCallers.has(dialed) &&
+          !callbackTracker.has(dialed)
+        ) {
+          extMap[fromUser].Callbacks++;
+
+          callbackTracker.add(dialed);
         }
       }
     });
@@ -139,7 +164,7 @@ export default function Home() {
     );
 
     setExtensionStats(stats);
-    setTotalCallbacks(callbackSet.size);
+    setTotalCallbacks(callbackTracker.size);
   }
 
   function downloadExcel() {
