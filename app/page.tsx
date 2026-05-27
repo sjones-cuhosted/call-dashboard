@@ -30,7 +30,11 @@ export default function Home() {
     return { excludedList, rangeList };
   }
 
-  function isExcluded(ext: string, excludedList: number[], rangeList: any[]) {
+  function isExcluded(
+    ext: string,
+    excludedList: number[],
+    rangeList: any[]
+  ) {
     const num = parseInt(ext);
 
     if (isNaN(num)) return true;
@@ -66,7 +70,7 @@ export default function Home() {
 
       if (!ext) return;
 
-      // 🔥 FILTERING
+      // EXCLUSIONS
       if (isExcluded(ext, excludedList, rangeList)) return;
 
       const disposition = (
@@ -84,20 +88,23 @@ export default function Home() {
           Total: 0,
           Answered: 0,
           Voicemail: 0,
+          HungUp: 0,
         };
       }
 
       extMap[ext].Total++;
 
-      // 🔥 BETTER VM DETECTION
-      if (
-        disposition.includes("vm") ||
-        disposition.includes("vmail") ||
-        disposition.includes("voicemail") ||
-        disposition.includes("mailbox")
-      ) {
+      // BUSINESS LOGIC
+      if (disposition.includes("vmail")) {
         extMap[ext].Voicemail++;
-      } else {
+      }
+      else if (
+        disposition.includes("speakaccount") ||
+        disposition.includes("system")
+      ) {
+        extMap[ext].HungUp++;
+      }
+      else {
         extMap[ext].Answered++;
       }
 
@@ -119,9 +126,11 @@ export default function Home() {
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
+    // SUMMARY TAB
     const ws1 = XLSX.utils.json_to_sheet(extensionStats);
     XLSX.utils.book_append_sheet(wb, ws1, "Extension Summary");
 
+    // DETAILS TAB
     const ws2 = XLSX.utils.json_to_sheet(detailData);
     XLSX.utils.book_append_sheet(wb, ws2, "Details");
 
@@ -143,10 +152,16 @@ export default function Home() {
     0
   );
 
+  const totalHungUp = extensionStats.reduce(
+    (sum, r) => sum + r.HungUp,
+    0
+  );
+
   return (
     <div style={outer}>
       <div style={card}>
 
+        {/* HEADER */}
         <div style={header}>
           <img src="/logo.png" style={logo} />
           <h1 style={title}>Call Dashboard</h1>
@@ -158,6 +173,7 @@ export default function Home() {
             <Stat label="Total Calls" value={totalCalls} />
             <Stat label="Answered" value={totalAnswered} />
             <Stat label="Voicemails" value={totalVM} />
+            <Stat label="Hung Up" value={totalHungUp} />
           </div>
         )}
 
@@ -203,6 +219,7 @@ export default function Home() {
                 <th style={th}>Total Calls</th>
                 <th style={th}>Answered</th>
                 <th style={th}>Voicemail</th>
+                <th style={th}>Hung Up</th>
               </tr>
             </thead>
 
@@ -213,6 +230,7 @@ export default function Home() {
                   <td style={td}>{r.Total}</td>
                   <td style={td}>{r.Answered}</td>
                   <td style={td}>{r.Voicemail}</td>
+                  <td style={td}>{r.HungUp}</td>
                 </tr>
               ))}
             </tbody>
@@ -248,7 +266,7 @@ const outer = {
 };
 
 const card = {
-  maxWidth: 1100,
+  maxWidth: 1200,
   margin: "auto",
   background: "white",
   padding: 30,
@@ -271,6 +289,7 @@ const logo = {
 const title = {
   margin: 0,
   color: "#111",
+  fontWeight: 600,
 };
 
 const statsRow = {
@@ -324,6 +343,7 @@ const button = {
   color: "white",
   border: "none",
   borderRadius: 6,
+  cursor: "pointer",
 };
 
 const table = {
