@@ -7,11 +7,10 @@ import Papa from "papaparse";
 
 export default function Home() {
   const [extensionStats, setExtensionStats] = useState<any[]>([]);
-  const [detailData, setDetailData] = useState<any[]>([]);
   const [excluded, setExcluded] = useState("");
   const [ranges, setRanges] = useState("");
 
-  const [uniqueCallbacks, setUniqueCallbacks] = useState(0);
+  const [totalCallbacks, setTotalCallbacks] = useState(0);
 
   function parseFilters() {
     const excludedList = excluded
@@ -63,11 +62,12 @@ export default function Home() {
     const { excludedList, rangeList } = parseFilters();
 
     let extMap: any = {};
-    let detail: any[] = [];
 
-    // 🔥 CALLBACK TRACKING
-    let callerMap: any = {};
-    let resolvedCallbacks = new Set();
+    // caller tracking
+    let callerHistory: any = {};
+
+    // unique callbacks
+    let callbackSet = new Set();
 
     parsed.forEach((row: any) => {
       const ext = row["To User"]?.toString().trim();
@@ -76,7 +76,9 @@ export default function Home() {
 
       if (isExcluded(ext, excludedList, rangeList)) return;
 
-      const caller = (row["From"] || "").toString().trim();
+      const caller = (row["From"] || "")
+        .toString()
+        .trim();
 
       const toField = (row["To"] || "")
         .toString()
@@ -89,59 +91,47 @@ export default function Home() {
           Answered: 0,
           Voicemail: 0,
           HungUp: 0,
+          Callbacks: 0,
         };
       }
 
       extMap[ext].Total++;
 
-      // 🔥 VOICEMAIL
+      // VOICEMAIL
       if (toField.includes("vmail")) {
         extMap[ext].Voicemail++;
 
-        if (!callerMap[caller]) {
-          callerMap[caller] = {
-            missed: true,
-            resolved: false,
-          };
-        }
+        callerHistory[caller] = {
+          missed: true,
+        };
       }
 
-      // 🔥 HUNG UP
+      // HUNG UP
       else if (
         toField.includes("speakaccount") ||
         toField.includes("system")
       ) {
         extMap[ext].HungUp++;
 
-        if (!callerMap[caller]) {
-          callerMap[caller] = {
-            missed: true,
-            resolved: false,
-          };
-        }
+        callerHistory[caller] = {
+          missed: true,
+        };
       }
 
-      // 🔥 ANSWERED
+      // ANSWERED
       else {
         extMap[ext].Answered++;
 
-        // caller previously missed?
+        // callback logic
         if (
-          callerMap[caller] &&
-          callerMap[caller].missed &&
-          !callerMap[caller].resolved
+          callerHistory[caller] &&
+          callerHistory[caller].missed &&
+          !callbackSet.has(caller)
         ) {
-          callerMap[caller].resolved = true;
-          resolvedCallbacks.add(caller);
+          extMap[ext].Callbacks++;
+          callbackSet.add(caller);
         }
       }
-
-      detail.push({
-        Date: new Date(row["Call Date"]).toLocaleDateString("en-US"),
-        Extension: ext,
-        Result: row["To"],
-        Caller: caller,
-      });
     });
 
     const stats = Object.values(extMap).sort(
@@ -149,20 +139,19 @@ export default function Home() {
     );
 
     setExtensionStats(stats);
-    setDetailData(detail);
-    setUniqueCallbacks(resolvedCallbacks.size);
+    setTotalCallbacks(callbackSet.size);
   }
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    // SUMMARY
     const ws1 = XLSX.utils.json_to_sheet(extensionStats);
-    XLSX.utils.book_append_sheet(wb, ws1, "Extension Summary");
 
-    // DETAILS
-    const ws2 = XLSX.utils.json_to_sheet(detailData);
-    XLSX.utils.book_append_sheet(wb, ws2, "Details");
+    XLSX.utils.book_append_sheet(
+      wb,
+      ws1,
+      "Extension Summary"
+    );
 
     XLSX.writeFile(wb, "call_report.xlsx");
   }
@@ -204,7 +193,7 @@ export default function Home() {
             <Stat label="Answered" value={totalAnswered} />
             <Stat label="Voicemails" value={totalVM} />
             <Stat label="Hung Up" value={totalHungUp} />
-            <Stat label="Callbacks" value={uniqueCallbacks} />
+            <Stat label="Callbacks" value={totalCallbacks} />
           </div>
         )}
 
@@ -251,6 +240,7 @@ export default function Home() {
                 <th style={th}>Answered</th>
                 <th style={th}>Voicemail</th>
                 <th style={th}>Hung Up</th>
+                <th style={th}>Callbacks</th>
               </tr>
             </thead>
 
@@ -262,6 +252,7 @@ export default function Home() {
                   <td style={td}>{r.Answered}</td>
                   <td style={td}>{r.Voicemail}</td>
                   <td style={td}>{r.HungUp}</td>
+                  <td style={td}>{r.Callbacks}</td>
                 </tr>
               ))}
             </tbody>
@@ -297,7 +288,7 @@ const outer = {
 };
 
 const card = {
-  maxWidth: 1200,
+  maxWidth: 1300,
   margin: "auto",
   background: "white",
   padding: 30,
