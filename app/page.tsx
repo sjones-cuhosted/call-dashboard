@@ -260,8 +260,36 @@ export default function Home() {
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
+    // Clone stats
+    const exportData = [...extensionStats];
+
+    // Totals row
+    exportData.push({
+      Extension: "TOTALS",
+      Total: extensionStats.reduce(
+        (sum, r) => sum + r.Total,
+        0
+      ),
+      Answered: extensionStats.reduce(
+        (sum, r) => sum + r.Answered,
+        0
+      ),
+      Voicemail: extensionStats.reduce(
+        (sum, r) => sum + r.Voicemail,
+        0
+      ),
+      HungUp: extensionStats.reduce(
+        (sum, r) => sum + r.HungUp,
+        0
+      ),
+      Callbacks: extensionStats.reduce(
+        (sum, r) => sum + r.Callbacks,
+        0
+      ),
+    });
+
     const ws1 = XLSX.utils.json_to_sheet(
-      extensionStats
+      exportData
     );
 
     XLSX.utils.book_append_sheet(
