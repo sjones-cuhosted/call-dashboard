@@ -79,7 +79,7 @@ export default function Home() {
       }
 
       //
-      // COUNT CALLS
+      // COUNT TOTAL CALLS
       //
       extMap[ext].Calls++;
 
