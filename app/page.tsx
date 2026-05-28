@@ -9,6 +9,26 @@ export default function Home() {
   const [extensionStats, setExtensionStats] = useState<any[]>([]);
   const [totalCalls, setTotalCalls] = useState(0);
 
+  //
+  // EXCLUDED SYSTEM EXTENSIONS
+  //
+  function isExcluded(ext: string) {
+    const num = parseInt(ext);
+
+    if (isNaN(num)) return true;
+
+    // MAIN INBOUND
+    if (num === 300) return true;
+
+    // AUTO ATTENDANTS
+    if (num >= 400 && num <= 402) return true;
+
+    // OTHER SYSTEM RANGES
+    if (num >= 700 && num <= 799) return true;
+
+    return false;
+  }
+
   async function handleFile(file: File) {
     const text = await file.text();
 
@@ -18,11 +38,11 @@ export default function Home() {
     }).data;
 
     //
-    // TOTAL INBOUND CALLS
+    // TOTAL OFFICE CALLS
     //
     setTotalCalls(parsed.length);
 
-    let vmMap: any = {};
+    let extMap: any = {};
 
     parsed.forEach((row: any) => {
       const ext = row["To User"]
@@ -36,42 +56,48 @@ export default function Home() {
         .toLowerCase();
 
       //
-      // ONLY COUNT VOICEMAIL ROWS
+      // SKIP EMPTY
+      //
+      if (!ext) return;
+
+      //
+      // SKIP SYSTEM EXTENSIONS
+      //
+      if (isExcluded(ext)) {
+        return;
+      }
+
+      //
+      // CREATE EXTENSION
+      //
+      if (!extMap[ext]) {
+        extMap[ext] = {
+          Extension: ext,
+          Calls: 0,
+          Voicemails: 0,
+        };
+      }
+
+      //
+      // COUNT CALLS
+      //
+      extMap[ext].Calls++;
+
+      //
+      // COUNT VOICEMAILS
       //
       if (
-        ext &&
         toField.includes("vmail")
       ) {
-
-        //
-        // EXCLUDE SYSTEM EXTENSIONS
-        //
-        if (
-          ext === "300" ||
-          ext === "400" ||
-          ext === "401" ||
-          ext === "402"
-        ) {
-          return;
-        }
-
-        if (!vmMap[ext]) {
-          vmMap[ext] = {
-            Extension: ext,
-            Voicemails: 0,
-          };
-        }
-
-        vmMap[ext].Voicemails++;
+        extMap[ext].Voicemails++;
       }
     });
 
     const stats = Object.values(
-      vmMap
+      extMap
     ).sort(
       (a: any, b: any) =>
-        b.Voicemails -
-        a.Voicemails
+        b.Calls - a.Calls
     );
 
     setExtensionStats(stats);
@@ -90,6 +116,12 @@ export default function Home() {
     exportData.push({
       Extension: "TOTALS",
 
+      Calls: extensionStats.reduce(
+        (sum, r) =>
+          sum + r.Calls,
+        0
+      ),
+
       Voicemails:
         extensionStats.reduce(
           (sum, r) =>
@@ -106,7 +138,7 @@ export default function Home() {
     XLSX.utils.book_append_sheet(
       wb,
       ws1,
-      "Voicemail Summary"
+      "Extension Summary"
     );
 
     XLSX.writeFile(
@@ -141,7 +173,7 @@ export default function Home() {
         {/* SUMMARY */}
         <div style={statsRow}>
           <Stat
-            label="Total Calls"
+            label="Total Office Calls"
             value={totalCalls}
           />
 
@@ -151,7 +183,7 @@ export default function Home() {
           />
         </div>
 
-        {/* UPLOAD */}
+        {/* FILE UPLOAD */}
         <div
           style={{
             marginTop: 25,
@@ -196,6 +228,10 @@ export default function Home() {
                 </th>
 
                 <th style={th}>
+                  Calls
+                </th>
+
+                <th style={th}>
                   Voicemails
                 </th>
               </tr>
@@ -212,6 +248,10 @@ export default function Home() {
                       {
                         r.Extension
                       }
+                    </td>
+
+                    <td style={td}>
+                      {r.Calls}
                     </td>
 
                     <td style={td}>
@@ -270,7 +310,7 @@ const outer = {
 };
 
 const card = {
-  maxWidth: 1000,
+  maxWidth: 1100,
   margin: "auto",
   background: "white",
   padding: 30,
@@ -350,7 +390,7 @@ const table = {
   width: "100%",
   marginTop: 25,
   borderCollapse:
-    "collapse" as const,
+    "collapse",
 };
 
 const thead = {
@@ -359,8 +399,7 @@ const thead = {
 };
 
 const th = {
-  textAlign:
-    "left" as const,
+  textAlign: "left",
   padding: 12,
   color: "#111",
   borderBottom:
