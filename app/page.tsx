@@ -412,7 +412,7 @@ const table = {
   width: "100%",
   marginTop: 25,
   borderCollapse:
-    "collapse",
+    "collapse" as const,
 };
 
 const thead = {
