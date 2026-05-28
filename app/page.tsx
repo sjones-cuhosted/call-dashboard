@@ -9,24 +9,52 @@ export default function Home() {
   const [extensionStats, setExtensionStats] = useState<any[]>([]);
   const [totalCalls, setTotalCalls] = useState(0);
 
-  //
-  // EXCLUDED SYSTEM EXTENSIONS
-  //
   function isExcluded(ext: string) {
     const num = parseInt(ext);
 
     if (isNaN(num)) return true;
 
-    // MAIN INBOUND
     if (num === 300) return true;
 
-    // AUTO ATTENDANTS
-    if (num >= 400 && num <= 402) return true;
+    if (num >= 400 && num <= 402)
+      return true;
 
-    // OTHER SYSTEM RANGES
-    if (num >= 700 && num <= 799) return true;
+    if (num >= 700 && num <= 799)
+      return true;
 
     return false;
+  }
+
+  function extractExtension(
+    row: any
+  ) {
+    //
+    // TRY TO USER FIRST
+    //
+    let ext = row["To User"]
+      ?.toString()
+      .trim();
+
+    if (ext) return ext;
+
+    //
+    // FALL BACK TO "TO"
+    //
+    const toField = (
+      row["To"] || ""
+    ).toString();
+
+    //
+    // FIND 3-4 DIGIT EXTENSION
+    //
+    const match =
+      toField.match(/\b\d{3,4}\b/);
+
+    if (match) {
+      return match[0];
+    }
+
+    return null;
   }
 
   async function handleFile(file: File) {
@@ -45,9 +73,9 @@ export default function Home() {
     let extMap: any = {};
 
     parsed.forEach((row: any) => {
-      const ext = row["To User"]
-        ?.toString()
-        .trim();
+
+      const ext =
+        extractExtension(row);
 
       const toField = (
         row["To"] || ""
@@ -55,13 +83,10 @@ export default function Home() {
         .toString()
         .toLowerCase();
 
-      //
-      // SKIP EMPTY
-      //
       if (!ext) return;
 
       //
-      // SKIP SYSTEM EXTENSIONS
+      // EXCLUDE SYSTEMS
       //
       if (isExcluded(ext)) {
         return;
@@ -79,12 +104,12 @@ export default function Home() {
       }
 
       //
-      // COUNT TOTAL CALLS
+      // COUNT CALLS
       //
       extMap[ext].Calls++;
 
       //
-      // COUNT VOICEMAILS
+      // COUNT VM
       //
       if (
         toField.includes("vmail")
@@ -110,9 +135,6 @@ export default function Home() {
       ...extensionStats,
     ];
 
-    //
-    // TOTALS ROW
-    //
     exportData.push({
       Extension: "TOTALS",
 
@@ -183,7 +205,7 @@ export default function Home() {
           />
         </div>
 
-        {/* FILE UPLOAD */}
+        {/* UPLOAD */}
         <div
           style={{
             marginTop: 25,
