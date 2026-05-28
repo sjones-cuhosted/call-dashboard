@@ -10,10 +10,6 @@ export default function Home() {
   const [excluded, setExcluded] = useState("");
   const [ranges, setRanges] = useState("");
 
-  const [totalCallbacks, setTotalCallbacks] = useState(0);
-  const [vmCallbacks, setVmCallbacks] = useState(0);
-  const [hungCallbacks, setHungCallbacks] = useState(0);
-
   function parseFilters() {
     const excludedList = excluded
       .split(",")
@@ -53,53 +49,6 @@ export default function Home() {
     return false;
   }
 
-  function cleanNumber(value: string) {
-    return value.replace(/\D/g, "");
-  }
-
-  function isInternalDial(dialed: string) {
-    const d = dialed.toLowerCase();
-
-    return (
-      d.includes("x721") ||
-      d.includes("x722") ||
-      d.includes("x723")
-    );
-  }
-
-  function isOutboundCall(
-    from: string,
-    fromName: string,
-    dialed: string
-  ) {
-    const cleanFrom = cleanNumber(from);
-    const cleanDialed = cleanNumber(dialed);
-
-    //
-    // MAIN OFFICE NUMBER
-    //
-    if (
-      cleanFrom === "9723149330" &&
-      !isInternalDial(dialed)
-    ) {
-      return true;
-    }
-
-    //
-    // EXTENSION CALLING 10 DIGIT #
-    //
-    const extensionPattern = /^\d{3,4}$/;
-
-    if (
-      extensionPattern.test(fromName.trim()) &&
-      cleanDialed.length === 10
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
   async function handleFile(file: File) {
     const text = await file.text();
 
@@ -112,210 +61,71 @@ export default function Home() {
 
     let extMap: any = {};
 
-    //
-    // TRACK MISSED CALL TYPES
-    //
-    let vmCallers = new Set<string>();
-    let hungCallers = new Set<string>();
-
-    //
-    // PREVENT DUPLICATE CALLBACK COUNTS
-    //
-    let vmCallbackTracker = new Set<string>();
-    let hungCallbackTracker = new Set<string>();
-
     parsed.forEach((row: any) => {
-      const toUser = row["To User"]?.toString().trim();
-      const fromUser = row["From User"]?.toString().trim();
+      const ext = row["To User"]?.toString().trim();
 
-      const from = (row["From"] || "").toString();
-      const fromName = (row["From Name"] || "").toString();
-      const dialed = (row["Dialed"] || "").toString();
+      if (!ext) return;
 
-      const cleanFrom = cleanNumber(from);
-      const cleanDialed = cleanNumber(dialed);
+      if (
+        isExcluded(
+          ext,
+          excludedList,
+          rangeList
+        )
+      ) {
+        return;
+      }
 
       const toField = (row["To"] || "")
         .toString()
         .toLowerCase();
 
-      //
-      // DETECT OUTBOUND
-      //
-      const outbound = isOutboundCall(
-        from,
-        fromName,
-        dialed
-      );
-
-      //
-      // ===========================
-      // INBOUND
-      // ===========================
-      //
-      if (
-        !outbound &&
-        toUser &&
-        !isExcluded(
-          toUser,
-          excludedList,
-          rangeList
-        )
-      ) {
-
-        if (!extMap[toUser]) {
-          extMap[toUser] = {
-            Extension: toUser,
-            Total: 0,
-            Answered: 0,
-            Voicemail: 0,
-            HungUp: 0,
-            VMCallbacks: 0,
-            HungCallbacks: 0,
-          };
-        }
-
-        extMap[toUser].Total++;
-
-        //
-        // VOICEMAIL
-        //
-        if (toField.includes("vmail")) {
-          extMap[toUser].Voicemail++;
-
-          if (cleanFrom.length === 10) {
-            vmCallers.add(cleanFrom);
-          }
-        }
-
-        //
-        // HUNG UP
-        //
-        else if (
-          toField.includes("speakaccount") ||
-          toField.includes("system")
-        ) {
-          extMap[toUser].HungUp++;
-
-          if (cleanFrom.length === 10) {
-            hungCallers.add(cleanFrom);
-          }
-        }
-
-        //
-        // ANSWERED
-        //
-        else {
-          extMap[toUser].Answered++;
-        }
+      if (!extMap[ext]) {
+        extMap[ext] = {
+          Extension: ext,
+          TotalInbound: 0,
+          Voicemails: 0,
+        };
       }
 
       //
-      // ===========================
-      // CALLBACKS
-      // ===========================
+      // COUNT INBOUND
       //
-      if (
-        outbound &&
-        fromUser &&
-        !isExcluded(
-          fromUser,
-          excludedList,
-          rangeList
-        )
-      ) {
+      extMap[ext].TotalInbound++;
 
-        if (!extMap[fromUser]) {
-          extMap[fromUser] = {
-            Extension: fromUser,
-            Total: 0,
-            Answered: 0,
-            Voicemail: 0,
-            HungUp: 0,
-            VMCallbacks: 0,
-            HungCallbacks: 0,
-          };
-        }
-
-        //
-        // VM CALLBACK
-        //
-        if (
-          vmCallers.has(cleanDialed) &&
-          !vmCallbackTracker.has(cleanDialed)
-        ) {
-          extMap[fromUser].VMCallbacks++;
-
-          vmCallbackTracker.add(cleanDialed);
-        }
-
-        //
-        // HUNG UP CALLBACK
-        //
-        if (
-          hungCallers.has(cleanDialed) &&
-          !hungCallbackTracker.has(cleanDialed)
-        ) {
-          extMap[fromUser].HungCallbacks++;
-
-          hungCallbackTracker.add(cleanDialed);
-        }
+      //
+      // COUNT VOICEMAILS
+      //
+      if (toField.includes("vmail")) {
+        extMap[ext].Voicemails++;
       }
     });
 
     const stats = Object.values(extMap).sort(
-      (a: any, b: any) => b.Total - a.Total
+      (a: any, b: any) =>
+        b.TotalInbound - a.TotalInbound
     );
 
     setExtensionStats(stats);
-
-    setVmCallbacks(vmCallbackTracker.size);
-
-    setHungCallbacks(hungCallbackTracker.size);
-
-    setTotalCallbacks(
-      vmCallbackTracker.size +
-      hungCallbackTracker.size
-    );
   }
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    // EXPORT DATA
+    // CLONE DATA
     const exportData = [...extensionStats];
 
     // TOTALS ROW
     exportData.push({
       Extension: "TOTALS",
 
-      Total: extensionStats.reduce(
-        (sum, r) => sum + r.Total,
+      TotalInbound: extensionStats.reduce(
+        (sum, r) => sum + r.TotalInbound,
         0
       ),
 
-      Answered: extensionStats.reduce(
-        (sum, r) => sum + r.Answered,
-        0
-      ),
-
-      Voicemail: extensionStats.reduce(
-        (sum, r) => sum + r.Voicemail,
-        0
-      ),
-
-      HungUp: extensionStats.reduce(
-        (sum, r) => sum + r.HungUp,
-        0
-      ),
-
-      VMCallbacks: extensionStats.reduce(
-        (sum, r) => sum + r.VMCallbacks,
-        0
-      ),
-
-      HungCallbacks: extensionStats.reduce(
-        (sum, r) => sum + r.HungCallbacks,
+      Voicemails: extensionStats.reduce(
+        (sum, r) => sum + r.Voicemails,
         0
       ),
     });
@@ -333,23 +143,13 @@ export default function Home() {
     XLSX.writeFile(wb, "call_report.xlsx");
   }
 
-  const totalCalls = extensionStats.reduce(
-    (sum, r) => sum + r.Total,
-    0
-  );
-
-  const totalAnswered = extensionStats.reduce(
-    (sum, r) => sum + r.Answered,
+  const totalInbound = extensionStats.reduce(
+    (sum, r) => sum + r.TotalInbound,
     0
   );
 
   const totalVM = extensionStats.reduce(
-    (sum, r) => sum + r.Voicemail,
-    0
-  );
-
-  const totalHungUp = extensionStats.reduce(
-    (sum, r) => sum + r.HungUp,
+    (sum, r) => sum + r.Voicemails,
     0
   );
 
@@ -360,19 +160,24 @@ export default function Home() {
         {/* HEADER */}
         <div style={header}>
           <img src="/logo.png" style={logo} />
-          <h1 style={title}>Call Dashboard</h1>
+
+          <h1 style={title}>
+            Call Dashboard
+          </h1>
         </div>
 
         {/* STATS */}
         {extensionStats.length > 0 && (
           <div style={statsRow}>
-            <Stat label="Total Calls" value={totalCalls} />
-            <Stat label="Answered" value={totalAnswered} />
-            <Stat label="Voicemails" value={totalVM} />
-            <Stat label="Hung Up" value={totalHungUp} />
-            <Stat label="VM Callbacks" value={vmCallbacks} />
-            <Stat label="Hung Callbacks" value={hungCallbacks} />
-            <Stat label="Total Callbacks" value={totalCallbacks} />
+            <Stat
+              label="Total Inbound Calls"
+              value={totalInbound}
+            />
+
+            <Stat
+              label="Total Voicemails"
+              value={totalVM}
+            />
           </div>
         )}
 
@@ -426,13 +231,17 @@ export default function Home() {
           <table style={table}>
             <thead style={thead}>
               <tr>
-                <th style={th}>Extension</th>
-                <th style={th}>Total</th>
-                <th style={th}>Answered</th>
-                <th style={th}>Voicemail</th>
-                <th style={th}>Hung Up</th>
-                <th style={th}>VM Callbacks</th>
-                <th style={th}>Hung Callbacks</th>
+                <th style={th}>
+                  Extension
+                </th>
+
+                <th style={th}>
+                  Total Inbound
+                </th>
+
+                <th style={th}>
+                  Voicemails
+                </th>
               </tr>
             </thead>
 
@@ -445,27 +254,11 @@ export default function Home() {
                     </td>
 
                     <td style={td}>
-                      {r.Total}
+                      {r.TotalInbound}
                     </td>
 
                     <td style={td}>
-                      {r.Answered}
-                    </td>
-
-                    <td style={td}>
-                      {r.Voicemail}
-                    </td>
-
-                    <td style={td}>
-                      {r.HungUp}
-                    </td>
-
-                    <td style={td}>
-                      {r.VMCallbacks}
-                    </td>
-
-                    <td style={td}>
-                      {r.HungCallbacks}
+                      {r.Voicemails}
                     </td>
                   </tr>
                 )
@@ -512,7 +305,7 @@ const outer = {
 };
 
 const card = {
-  maxWidth: 1450,
+  maxWidth: 1200,
   margin: "auto",
   background: "white",
   padding: 30,
@@ -544,12 +337,10 @@ const statsRow = {
   display: "flex",
   gap: 15,
   marginTop: 20,
-  flexWrap: "wrap" as const,
 };
 
 const statCard = {
   flex: 1,
-  minWidth: 160,
   background: "#f9fafb",
   border:
     "1px solid #e5e7eb",
