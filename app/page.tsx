@@ -9,54 +9,6 @@ export default function Home() {
   const [extensionStats, setExtensionStats] = useState<any[]>([]);
   const [totalCalls, setTotalCalls] = useState(0);
 
-  function isExcluded(ext: string) {
-    const num = parseInt(ext);
-
-    if (isNaN(num)) return true;
-
-    if (num === 300) return true;
-
-    if (num >= 400 && num <= 402)
-      return true;
-
-    if (num >= 700 && num <= 799)
-      return true;
-
-    return false;
-  }
-
-  function extractExtension(
-    row: any
-  ) {
-    //
-    // TRY TO USER FIRST
-    //
-    let ext = row["To User"]
-      ?.toString()
-      .trim();
-
-    if (ext) return ext;
-
-    //
-    // FALL BACK TO "TO"
-    //
-    const toField = (
-      row["To"] || ""
-    ).toString();
-
-    //
-    // FIND 3-4 DIGIT EXTENSION
-    //
-    const match =
-      toField.match(/\b\d{3,4}\b/);
-
-    if (match) {
-      return match[0];
-    }
-
-    return null;
-  }
-
   async function handleFile(file: File) {
     const text = await file.text();
 
@@ -74,21 +26,67 @@ export default function Home() {
 
     parsed.forEach((row: any) => {
 
-      const ext =
-        extractExtension(row);
+      const dialed = (
+        row["Dialed"] || ""
+      ).toString();
 
       const toField = (
         row["To"] || ""
-      )
-        .toString()
-        .toLowerCase();
+      ).toString();
 
-      if (!ext) return;
+      const lowerTo =
+        toField.toLowerCase();
 
       //
-      // EXCLUDE SYSTEMS
+      // ONLY MAIN NUMBER
       //
-      if (isExcluded(ext)) {
+      if (
+        !dialed.includes(
+          "9723149330"
+        )
+      ) {
+        return;
+      }
+
+      //
+      // IGNORE HANGUPS
+      //
+      if (
+        lowerTo.includes(
+          "system"
+        ) ||
+        lowerTo.includes(
+          "speakaccount"
+        )
+      ) {
+        return;
+      }
+
+      //
+      // FIND EXTENSION
+      //
+      const match =
+        toField.match(/\d{3,4}/);
+
+      if (!match) return;
+
+      const ext = match[0];
+
+      const num = parseInt(ext);
+
+      //
+      // EXCLUDE:
+      // 300
+      // 400-402
+      // 700-799
+      //
+      if (
+        num === 300 ||
+        (num >= 400 &&
+          num <= 402) ||
+        (num >= 700 &&
+          num <= 799)
+      ) {
         return;
       }
 
@@ -109,12 +107,15 @@ export default function Home() {
       extMap[ext].Calls++;
 
       //
-      // COUNT VM
+      // COUNT VOICEMAILS
       //
       if (
-        toField.includes("vmail")
+        lowerTo.includes(
+          "vmail"
+        )
       ) {
-        extMap[ext].Voicemails++;
+        extMap[ext]
+          .Voicemails++;
       }
     });
 
@@ -135,6 +136,9 @@ export default function Home() {
       ...extensionStats,
     ];
 
+    //
+    // TOTALS ROW
+    //
     exportData.push({
       Extension: "TOTALS",
 
@@ -205,7 +209,7 @@ export default function Home() {
           />
         </div>
 
-        {/* UPLOAD */}
+        {/* FILE UPLOAD */}
         <div
           style={{
             marginTop: 25,
@@ -421,7 +425,8 @@ const thead = {
 };
 
 const th = {
-  textAlign: "left",
+  textAlign:
+    "left" as const,
   padding: 12,
   color: "#111",
   borderBottom:
