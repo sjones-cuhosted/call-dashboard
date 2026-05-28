@@ -7,48 +7,7 @@ import Papa from "papaparse";
 
 export default function Home() {
   const [extensionStats, setExtensionStats] = useState<any[]>([]);
-  const [officeCalls, setOfficeCalls] = useState(0);
-  const [totalVM, setTotalVM] = useState(0);
-
-  const [excluded, setExcluded] = useState(
-    "400-402,700-799"
-  );
-
-  function parseFilters() {
-    const rangeList = excluded
-      .split(",")
-      .map((r) => r.trim())
-      .filter(Boolean)
-      .map((r) => {
-        const [start, end] = r
-          .split("-")
-          .map(Number);
-
-        return { start, end };
-      });
-
-    return rangeList;
-  }
-
-  function isExcluded(
-    ext: string,
-    rangeList: any[]
-  ) {
-    const num = parseInt(ext);
-
-    if (isNaN(num)) return true;
-
-    for (const r of rangeList) {
-      if (
-        num >= r.start &&
-        num <= r.end
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  }
+  const [totalCalls, setTotalCalls] = useState(0);
 
   async function handleFile(file: File) {
     const text = await file.text();
@@ -58,13 +17,12 @@ export default function Home() {
       skipEmptyLines: true,
     }).data;
 
-    const rangeList = parseFilters();
+    //
+    // TOTAL INBOUND CALLS
+    //
+    setTotalCalls(parsed.length);
 
-    let extMap: any = {};
-
-    let inbound300 = 0;
-
-    let vmTotal = 0;
+    let vmMap: any = {};
 
     parsed.forEach((row: any) => {
       const ext = row["To User"]
@@ -77,76 +35,46 @@ export default function Home() {
         .toString()
         .toLowerCase();
 
-      if (!ext) return;
-
       //
-      // =================================
-      // MASTER INBOUND CALLS
-      // =================================
-      //
-      if (ext === "300") {
-        inbound300++;
-      }
-
-      //
-      // =================================
-      // SKIP AUTO ATTENDANTS
-      // =================================
+      // ONLY COUNT VOICEMAIL ROWS
       //
       if (
-        isExcluded(ext, rangeList)
-      ) {
-        return;
-      }
-
-      //
-      // DO NOT SHOW 300
-      // IN EXTENSION TABLE
-      //
-      if (ext === "300") {
-        return;
-      }
-
-      //
-      // CREATE EXTENSION
-      //
-      if (!extMap[ext]) {
-        extMap[ext] = {
-          Extension: ext,
-          Calls: 0,
-          Voicemails: 0,
-        };
-      }
-
-      //
-      // COUNT CALLS
-      //
-      extMap[ext].Calls++;
-
-      //
-      // COUNT VM
-      //
-      if (
+        ext &&
         toField.includes("vmail")
       ) {
-        extMap[ext].Voicemails++;
 
-        vmTotal++;
+        //
+        // EXCLUDE SYSTEM EXTENSIONS
+        //
+        if (
+          ext === "300" ||
+          ext === "400" ||
+          ext === "401" ||
+          ext === "402"
+        ) {
+          return;
+        }
+
+        if (!vmMap[ext]) {
+          vmMap[ext] = {
+            Extension: ext,
+            Voicemails: 0,
+          };
+        }
+
+        vmMap[ext].Voicemails++;
       }
     });
 
     const stats = Object.values(
-      extMap
+      vmMap
     ).sort(
       (a: any, b: any) =>
-        b.Calls - a.Calls
+        b.Voicemails -
+        a.Voicemails
     );
 
     setExtensionStats(stats);
-
-    setOfficeCalls(inbound300);
-
-    setTotalVM(vmTotal);
   }
 
   function downloadExcel() {
@@ -161,12 +89,6 @@ export default function Home() {
     //
     exportData.push({
       Extension: "TOTALS",
-
-      Calls: extensionStats.reduce(
-        (sum, r) =>
-          sum + r.Calls,
-        0
-      ),
 
       Voicemails:
         extensionStats.reduce(
@@ -184,7 +106,7 @@ export default function Home() {
     XLSX.utils.book_append_sheet(
       wb,
       ws1,
-      "Extension Summary"
+      "Voicemail Summary"
     );
 
     XLSX.writeFile(
@@ -192,6 +114,13 @@ export default function Home() {
       "call_report.xlsx"
     );
   }
+
+  const totalVM =
+    extensionStats.reduce(
+      (sum, r) =>
+        sum + r.Voicemails,
+      0
+    );
 
   return (
     <div style={outer}>
@@ -210,39 +139,24 @@ export default function Home() {
         </div>
 
         {/* SUMMARY */}
-        {extensionStats.length >
-          0 && (
-          <div style={statsRow}>
-            <Stat
-              label="Total Office Calls"
-              value={officeCalls}
-            />
+        <div style={statsRow}>
+          <Stat
+            label="Total Calls"
+            value={totalCalls}
+          />
 
-            <Stat
-              label="Total Voicemails"
-              value={totalVM}
-            />
-          </div>
-        )}
+          <Stat
+            label="Total Voicemails"
+            value={totalVM}
+          />
+        </div>
 
-        {/* FILTERS */}
+        {/* UPLOAD */}
         <div
           style={{
             marginTop: 25,
           }}
         >
-          <Label text="Excluded Ranges" />
-
-          <input
-            value={excluded}
-            onChange={(e) =>
-              setExcluded(
-                e.target.value
-              )
-            }
-            style={input}
-          />
-
           <Label text="Upload PBX CSV" />
 
           <input
@@ -282,10 +196,6 @@ export default function Home() {
                 </th>
 
                 <th style={th}>
-                  Calls
-                </th>
-
-                <th style={th}>
                   Voicemails
                 </th>
               </tr>
@@ -302,10 +212,6 @@ export default function Home() {
                       {
                         r.Extension
                       }
-                    </td>
-
-                    <td style={td}>
-                      {r.Calls}
                     </td>
 
                     <td style={td}>
@@ -364,7 +270,7 @@ const outer = {
 };
 
 const card = {
-  maxWidth: 1200,
+  maxWidth: 1000,
   margin: "auto",
   background: "white",
   padding: 30,
@@ -423,16 +329,6 @@ const label = {
   fontSize: 13,
   marginBottom: 5,
   color: "#555",
-};
-
-const input = {
-  width: "100%",
-  padding: 12,
-  marginBottom: 15,
-  borderRadius: 6,
-  border:
-    "1px solid #d1d5db",
-  color: "#111",
 };
 
 const fileInput = {
