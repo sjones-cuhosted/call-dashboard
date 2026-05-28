@@ -7,41 +7,42 @@ import Papa from "papaparse";
 
 export default function Home() {
   const [extensionStats, setExtensionStats] = useState<any[]>([]);
-  const [excluded, setExcluded] = useState("");
-  const [ranges, setRanges] = useState("");
+  const [officeCalls, setOfficeCalls] = useState(0);
+  const [totalVM, setTotalVM] = useState(0);
+
+  const [excluded, setExcluded] = useState(
+    "400-402,700-799"
+  );
 
   function parseFilters() {
-    const excludedList = excluded
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .map(Number);
-
-    const rangeList = ranges
+    const rangeList = excluded
       .split(",")
       .map((r) => r.trim())
       .filter(Boolean)
       .map((r) => {
-        const [start, end] = r.split("-").map(Number);
+        const [start, end] = r
+          .split("-")
+          .map(Number);
+
         return { start, end };
       });
 
-    return { excludedList, rangeList };
+    return rangeList;
   }
 
   function isExcluded(
     ext: string,
-    excludedList: number[],
     rangeList: any[]
   ) {
     const num = parseInt(ext);
 
     if (isNaN(num)) return true;
 
-    if (excludedList.includes(num)) return true;
-
     for (const r of rangeList) {
-      if (num >= r.start && num <= r.end) {
+      if (
+        num >= r.start &&
+        num <= r.end
+      ) {
         return true;
       }
     }
@@ -57,82 +58,128 @@ export default function Home() {
       skipEmptyLines: true,
     }).data;
 
-    const { excludedList, rangeList } = parseFilters();
+    const rangeList = parseFilters();
 
     let extMap: any = {};
 
+    let inbound300 = 0;
+
+    let vmTotal = 0;
+
     parsed.forEach((row: any) => {
-      const ext = row["To User"]?.toString().trim();
+      const ext = row["To User"]
+        ?.toString()
+        .trim();
+
+      const toField = (
+        row["To"] || ""
+      )
+        .toString()
+        .toLowerCase();
 
       if (!ext) return;
 
+      //
+      // =================================
+      // MASTER INBOUND CALLS
+      // =================================
+      //
+      if (ext === "300") {
+        inbound300++;
+      }
+
+      //
+      // =================================
+      // SKIP AUTO ATTENDANTS
+      // =================================
+      //
       if (
-        isExcluded(
-          ext,
-          excludedList,
-          rangeList
-        )
+        isExcluded(ext, rangeList)
       ) {
         return;
       }
 
-      const toField = (row["To"] || "")
-        .toString()
-        .toLowerCase();
+      //
+      // DO NOT SHOW 300
+      // IN EXTENSION TABLE
+      //
+      if (ext === "300") {
+        return;
+      }
 
+      //
+      // CREATE EXTENSION
+      //
       if (!extMap[ext]) {
         extMap[ext] = {
           Extension: ext,
-          TotalInbound: 0,
+          Calls: 0,
           Voicemails: 0,
         };
       }
 
       //
-      // COUNT INBOUND
+      // COUNT CALLS
       //
-      extMap[ext].TotalInbound++;
+      extMap[ext].Calls++;
 
       //
-      // COUNT VOICEMAILS
+      // COUNT VM
       //
-      if (toField.includes("vmail")) {
+      if (
+        toField.includes("vmail")
+      ) {
         extMap[ext].Voicemails++;
+
+        vmTotal++;
       }
     });
 
-    const stats = Object.values(extMap).sort(
+    const stats = Object.values(
+      extMap
+    ).sort(
       (a: any, b: any) =>
-        b.TotalInbound - a.TotalInbound
+        b.Calls - a.Calls
     );
 
     setExtensionStats(stats);
+
+    setOfficeCalls(inbound300);
+
+    setTotalVM(vmTotal);
   }
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
-    // CLONE DATA
-    const exportData = [...extensionStats];
+    const exportData = [
+      ...extensionStats,
+    ];
 
+    //
     // TOTALS ROW
+    //
     exportData.push({
       Extension: "TOTALS",
 
-      TotalInbound: extensionStats.reduce(
-        (sum, r) => sum + r.TotalInbound,
+      Calls: extensionStats.reduce(
+        (sum, r) =>
+          sum + r.Calls,
         0
       ),
 
-      Voicemails: extensionStats.reduce(
-        (sum, r) => sum + r.Voicemails,
-        0
-      ),
+      Voicemails:
+        extensionStats.reduce(
+          (sum, r) =>
+            sum + r.Voicemails,
+          0
+        ),
     });
 
-    const ws1 = XLSX.utils.json_to_sheet(
-      exportData
-    );
+    const ws1 =
+      XLSX.utils.json_to_sheet(
+        exportData
+      );
 
     XLSX.utils.book_append_sheet(
       wb,
@@ -140,18 +187,11 @@ export default function Home() {
       "Extension Summary"
     );
 
-    XLSX.writeFile(wb, "call_report.xlsx");
+    XLSX.writeFile(
+      wb,
+      "call_report.xlsx"
+    );
   }
-
-  const totalInbound = extensionStats.reduce(
-    (sum, r) => sum + r.TotalInbound,
-    0
-  );
-
-  const totalVM = extensionStats.reduce(
-    (sum, r) => sum + r.Voicemails,
-    0
-  );
 
   return (
     <div style={outer}>
@@ -159,19 +199,23 @@ export default function Home() {
 
         {/* HEADER */}
         <div style={header}>
-          <img src="/logo.png" style={logo} />
+          <img
+            src="/logo.png"
+            style={logo}
+          />
 
           <h1 style={title}>
             Call Dashboard
           </h1>
         </div>
 
-        {/* STATS */}
-        {extensionStats.length > 0 && (
+        {/* SUMMARY */}
+        {extensionStats.length >
+          0 && (
           <div style={statsRow}>
             <Stat
-              label="Total Inbound Calls"
-              value={totalInbound}
+              label="Total Office Calls"
+              value={officeCalls}
             />
 
             <Stat
@@ -182,34 +226,31 @@ export default function Home() {
         )}
 
         {/* FILTERS */}
-        <div style={{ marginTop: 25 }}>
-          <Label text="Exclude Extensions" />
+        <div
+          style={{
+            marginTop: 25,
+          }}
+        >
+          <Label text="Excluded Ranges" />
 
           <input
-            placeholder="300,800"
+            value={excluded}
             onChange={(e) =>
-              setExcluded(e.target.value)
+              setExcluded(
+                e.target.value
+              )
             }
             style={input}
           />
 
-          <Label text="Exclude Ranges" />
-
-          <input
-            placeholder="400-499,700-799"
-            onChange={(e) =>
-              setRanges(e.target.value)
-            }
-            style={input}
-          />
-
-          <Label text="Upload Call Records CSV" />
+          <Label text="Upload PBX CSV" />
 
           <input
             type="file"
             onChange={(e) =>
               handleFile(
-                e.target.files?.[0] as File
+                e.target
+                  .files?.[0] as File
               )
             }
             style={fileInput}
@@ -217,17 +258,22 @@ export default function Home() {
         </div>
 
         {/* DOWNLOAD */}
-        {extensionStats.length > 0 && (
+        {extensionStats.length >
+          0 && (
           <button
-            onClick={downloadExcel}
+            onClick={
+              downloadExcel
+            }
             style={button}
           >
-            Download Excel Report
+            Download Excel
+            Report
           </button>
         )}
 
         {/* TABLE */}
-        {extensionStats.length > 0 && (
+        {extensionStats.length >
+          0 && (
           <table style={table}>
             <thead style={thead}>
               <tr>
@@ -236,7 +282,7 @@ export default function Home() {
                 </th>
 
                 <th style={th}>
-                  Total Inbound
+                  Calls
                 </th>
 
                 <th style={th}>
@@ -247,18 +293,25 @@ export default function Home() {
 
             <tbody>
               {extensionStats.map(
-                (r: any, i: number) => (
+                (
+                  r: any,
+                  i: number
+                ) => (
                   <tr key={i}>
                     <td style={td}>
-                      {r.Extension}
+                      {
+                        r.Extension
+                      }
                     </td>
 
                     <td style={td}>
-                      {r.TotalInbound}
+                      {r.Calls}
                     </td>
 
                     <td style={td}>
-                      {r.Voicemails}
+                      {
+                        r.Voicemails
+                      }
                     </td>
                   </tr>
                 )
@@ -274,7 +327,10 @@ export default function Home() {
 
 /* COMPONENTS */
 
-function Stat({ label, value }: any) {
+function Stat({
+  label,
+  value,
+}: any) {
   return (
     <div style={statCard}>
       <div style={statLabel}>
@@ -288,7 +344,9 @@ function Stat({ label, value }: any) {
   );
 }
 
-function Label({ text }: any) {
+function Label({
+  text,
+}: any) {
   return (
     <div style={label}>
       {text}
@@ -299,7 +357,8 @@ function Label({ text }: any) {
 /* STYLES */
 
 const outer = {
-  backgroundColor: "#f3f4f6",
+  backgroundColor:
+    "#f3f4f6",
   minHeight: "100vh",
   padding: 40,
 };
@@ -341,7 +400,8 @@ const statsRow = {
 
 const statCard = {
   flex: 1,
-  background: "#f9fafb",
+  background:
+    "#f9fafb",
   border:
     "1px solid #e5e7eb",
   padding: 15,
@@ -382,7 +442,8 @@ const fileInput = {
 
 const button = {
   padding: "12px 18px",
-  background: "#2563eb",
+  background:
+    "#2563eb",
   color: "white",
   border: "none",
   borderRadius: 6,
@@ -397,11 +458,13 @@ const table = {
 };
 
 const thead = {
-  background: "#f3f4f6",
+  background:
+    "#f3f4f6",
 };
 
 const th = {
-  textAlign: "left" as const,
+  textAlign:
+    "left" as const,
   padding: 12,
   color: "#111",
   borderBottom:
