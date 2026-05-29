@@ -96,8 +96,7 @@ if (
     // COUNTS AS A CALL
     //
     extMap[ext].Calls++;
-    totalExtensionCalls++;
-
+   
     //
     // COUNT VOICEMAILS
     //
