@@ -107,14 +107,16 @@ export default function Home() {
 
   setExtensionStats(stats);
 
-  //
-  // SUMMARY CARDS
-  //
-  setTotalCalls(
-    totalExtensionCalls
-  );
+//
+// SUMMARY CARDS
+//
+setTotalCalls(
+  totalExtensionCalls
+);
 
-  function downloadExcel() {
+}   // <-- ADD THIS LINE
+
+function downloadExcel() {
     const wb = XLSX.utils.book_new();
 
     const exportData = [
