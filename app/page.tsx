@@ -114,7 +114,7 @@ setTotalCalls(
   totalExtensionCalls
 );
 
-}   // <-- ADD THIS LINE
+}
 
 function downloadExcel() {
     const wb = XLSX.utils.book_new();
