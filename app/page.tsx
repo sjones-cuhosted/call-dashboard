@@ -22,7 +22,7 @@ export default function Home() {
     //
     setTotalCalls(parsed.length);
 
-    let extMap: any = {};
+    let extMap: any = {}; let totalExtensionCalls = 0; let totalVoicemails = 0;
 
     parsed.forEach((row: any) => {
 
@@ -104,7 +104,7 @@ export default function Home() {
       //
       // COUNT CALLS
       //
-      extMap[ext].Calls++;
+      extMap[ext].Calls++; totalExtensionCalls++;
 
       //
       // COUNT VOICEMAILS
