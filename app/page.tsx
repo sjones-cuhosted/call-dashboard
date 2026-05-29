@@ -10,124 +10,109 @@ export default function Home() {
   const [totalCalls, setTotalCalls] = useState(0);
 
   async function handleFile(file: File) {
-    const text = await file.text();
+  const text = await file.text();
 
-    const parsed = Papa.parse<any>(text, {
-      header: true,
-      skipEmptyLines: true,
-    }).data;
+  const parsed = Papa.parse<any>(text, {
+    header: true,
+    skipEmptyLines: true,
+  }).data;
+
+  let extMap: any = {};
+
+  let totalExtensionCalls = 0;
+  let totalVoicemails = 0;
+
+  parsed.forEach((row: any) => {
+    const toField = (
+      row["To"] || ""
+    ).toString().trim();
+
+    const lowerTo =
+      toField.toLowerCase();
 
     //
-    // TOTAL OFFICE CALLS
+    // IGNORE THESE
     //
-    setTotalCalls(parsed.length);
+    if (
+      lowerTo.includes("system") ||
+      lowerTo.includes("speakaccount") ||
+      lowerTo.includes("call-queue")
+    ) {
+      return;
+    }
 
-    let extMap: any = {}; let totalExtensionCalls = 0; let totalVoicemails = 0;
+    //
+    // FIND EXTENSION
+    // MATCHES:
+    // 201
+    // VMail (201)
+    //
+    const match =
+      toField.match(/\d{3}/);
 
-    parsed.forEach((row: any) => {
+    if (!match) return;
 
-      const dialed = (
-        row["Dialed"] || ""
-      ).toString();
+    const ext = match[0];
 
-      const toField = (
-        row["To"] || ""
-      ).toString();
+    const num = parseInt(ext);
 
-      const lowerTo =
-        toField.toLowerCase();
+    //
+    // EXCLUDE SYSTEM EXTENSIONS
+    //
+    if (
+      num === 300 ||
+      (num >= 400 &&
+        num <= 402) ||
+      (num >= 700 &&
+        num <= 799)
+    ) {
+      return;
+    }
 
-      //
-      // ONLY MAIN NUMBER
-      //
-      if (
-        !dialed.includes(
-          "9723149330"
-        )
-      ) {
-        return;
-      }
+    //
+    // CREATE EXTENSION
+    //
+    if (!extMap[ext]) {
+      extMap[ext] = {
+        Extension: ext,
+        Calls: 0,
+        Voicemails: 0,
+      };
+    }
 
-      //
-      // IGNORE HANGUPS
-      //
-      if (
-        lowerTo.includes(
-          "system"
-        ) ||
-        lowerTo.includes(
-          "speakaccount"
-        )
-      ) {
-        return;
-      }
+    //
+    // EVERY VALID EXTENSION ROW
+    // COUNTS AS A CALL
+    //
+    extMap[ext].Calls++;
+    totalExtensionCalls++;
 
-      //
-      // FIND EXTENSION
-      //
-      const match =
-        toField.match(/\d{3,4}/);
+    //
+    // COUNT VOICEMAILS
+    //
+    if (
+      lowerTo.includes("vmail")
+    ) {
+      extMap[ext].Voicemails++;
+      totalVoicemails++;
+    }
+  });
 
-      if (!match) return;
+  const stats = Object.values(
+    extMap
+  ).sort(
+    (a: any, b: any) =>
+      b.Calls - a.Calls
+  );
 
-      const ext = match[0];
+  setExtensionStats(stats);
 
-      const num = parseInt(ext);
-
-      //
-      // EXCLUDE:
-      // 300
-      // 400-402
-      // 700-799
-      //
-      if (
-        num === 300 ||
-        (num >= 400 &&
-          num <= 402) ||
-        (num >= 700 &&
-          num <= 799)
-      ) {
-        return;
-      }
-
-      //
-      // CREATE EXTENSION
-      //
-      if (!extMap[ext]) {
-        extMap[ext] = {
-          Extension: ext,
-          Calls: 0,
-          Voicemails: 0,
-        };
-      }
-
-      //
-      // COUNT CALLS
-      //
-      extMap[ext].Calls++; totalExtensionCalls++;
-
-      //
-      // COUNT VOICEMAILS
-      //
-      if (
-        lowerTo.includes(
-          "vmail"
-        )
-      ) {
-        extMap[ext]
-          .Voicemails++;
-      }
-    });
-
-    const stats = Object.values(
-      extMap
-    ).sort(
-      (a: any, b: any) =>
-        b.Calls - a.Calls
-    );
-
-    setExtensionStats(stats);
-  }
+  //
+  // SUMMARY CARDS
+  //
+  setTotalCalls(
+    totalExtensionCalls
+  );
 
   function downloadExcel() {
     const wb = XLSX.utils.book_new();
@@ -199,9 +184,9 @@ export default function Home() {
         {/* SUMMARY */}
         <div style={statsRow}>
           <Stat
-            label="Total Office Calls"
-            value={totalCalls}
-          />
+  label="Total Extension Calls"
+  value={totalCalls}
+/>
 
           <Stat
             label="Total Voicemails"
