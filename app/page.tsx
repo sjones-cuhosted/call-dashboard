@@ -19,8 +19,10 @@ export default function Home() {
 
   let extMap: any = {};
 
-  let totalExtensionCalls = 0;
-  let totalVoicemails = 0;
+const grandTotalCalls =
+  parsed.length;
+
+let totalVoicemails = 0;
 
   parsed.forEach((row: any) => {
     const toField = (
@@ -53,6 +55,15 @@ export default function Home() {
     if (!match) return;
 
     const ext = match[0];
+    //
+// IGNORE PHONE NUMBERS
+//
+if (
+  ext === "972" ||
+  ext.length > 3
+) {
+  return;
+}
 
     const num = parseInt(ext);
 
@@ -111,7 +122,7 @@ export default function Home() {
 // SUMMARY CARDS
 //
 setTotalCalls(
-  totalExtensionCalls
+  grandTotalCalls
 );
 
 }
@@ -186,7 +197,7 @@ function downloadExcel() {
         {/* SUMMARY */}
         <div style={statsRow}>
           <Stat
-  label="Total Extension Calls"
+  label="Grand Total Calls"
   value={totalCalls}
 />
 
