@@ -49,63 +49,53 @@ let totalVoicemails = 0;
     // 201
     // VMail (201)
     //
-    const match =
-      toField.match(/\d{3}/);
-
-    if (!match) return;
-
-    const ext = match[0];
     //
-// IGNORE PHONE NUMBERS
+// DIRECT EXTENSION (201, 202, etc.)
 //
-if (
-  ext === "972" ||
-  ext.length > 3
-) {
+if (/^\d{3}$/.test(toField)) {
+  const ext = toField;
+
+  if (!extMap[ext]) {
+    extMap[ext] = {
+      Extension: ext,
+      Calls: 0,
+      Voicemails: 0,
+    };
+  }
+
+  extMap[ext].Calls++;
   return;
 }
 
-    const num = parseInt(ext);
+//
+// VOICEMAIL (VMail (201))
+//
+const vmMatch =
+  toField.match(/^VMail\s*\((\d{3})\)$/i);
 
-    //
-    // EXCLUDE SYSTEM EXTENSIONS
-    //
-    if (
-      num === 300 ||
-      (num >= 400 &&
-        num <= 402) ||
-      (num >= 700 &&
-        num <= 799)
-    ) {
-      return;
-    }
+if (vmMatch) {
+  const ext = vmMatch[1];
 
-    //
-    // CREATE EXTENSION
-    //
-    if (!extMap[ext]) {
-      extMap[ext] = {
-        Extension: ext,
-        Calls: 0,
-        Voicemails: 0,
-      };
-    }
+  if (!extMap[ext]) {
+    extMap[ext] = {
+      Extension: ext,
+      Calls: 0,
+      Voicemails: 0,
+    };
+  }
 
-    //
-    // EVERY VALID EXTENSION ROW
-    // COUNTS AS A CALL
-    //
-    extMap[ext].Calls++;
-   
-    //
-    // COUNT VOICEMAILS
-    //
-    if (
-      lowerTo.includes("vmail")
-    ) {
-      extMap[ext].Voicemails++;
-      totalVoicemails++;
-    }
+  extMap[ext].Calls++;
+  extMap[ext].Voicemails++;
+  totalVoicemails++;
+
+  return;
+}
+
+//
+// EVERYTHING ELSE
+//
+return;
+    
   });
 
   const stats = Object.values(
